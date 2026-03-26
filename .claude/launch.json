@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "GovTrace AI Guardrail",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["main:app", "--reload", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "GovTrace Web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "govtrace-web", "--listen", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "Gobots Web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "gobots-web",
+      "port": 3001
+    }
+  ]
+}

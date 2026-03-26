@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GovTrace AI — Risk Screener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Segoe UI"', 'sans-serif'],
+          },
+          colors: {
+            safe:    { DEFAULT: '#34C759', light: '#F0FBF3' },
+            warning: { DEFAULT: '#FF9500', light: '#FFF8ED' },
+            block:   { DEFAULT: '#FF3B30', light: '#FFF2F1' },
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    body { -webkit-font-smoothing: antialiased; }
+    textarea { resize: none; }
+    .finding-body { display: none; }
+    .finding-open .finding-body { display: block; }
+    .finding-open .chevron { transform: rotate(180deg); }
+    .chevron { transition: transform 0.2s ease; }
+    .badge-safe    { background: #F0FBF3; color: #1a7a35; border: 1px solid #b8eec7; }
+    .badge-warning { background: #FFF8ED; color: #8a4e00; border: 1px solid #ffd68a; }
+    .badge-block   { background: #FFF2F1; color: #c0130a; border: 1px solid #ffb3af; }
+    .sev-high   { background: #FFF2F1; color: #c0130a; }
+    .sev-medium { background: #FFF8ED; color: #8a4e00; }
+    .sev-low    { background: #F0FBF3; color: #1a7a35; }
+  </style>
+</head>
+<body class="bg-[#F5F5F7] min-h-screen font-sans text-[#1d1d1f]">
+
+  <!-- Header -->
+  <header class="pt-12 pb-2 text-center px-6">
+    <p class="text-xs font-medium tracking-widest text-[#6e6e73] uppercase mb-3">GovTrace AI</p>
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-[#1d1d1f]">Risk Screener</h1>
+    <p class="mt-2 text-[15px] text-[#6e6e73] max-w-md mx-auto">Automated PII, injection, and overclaim detection for AI-generated content.</p>
+  </header>
+
+  <!-- Main card -->
+  <main class="max-w-2xl mx-auto px-4 py-10">
+    <div class="bg-white rounded-2xl shadow-sm border border-[#e5e5ea] overflow-hidden">
+
+      <!-- Input section -->
+      <div class="p-6 sm:p-8">
+        <label for="inputText" class="block text-[13px] font-medium text-[#6e6e73] mb-2 tracking-wide uppercase">Input Text</label>
+        <textarea
+          id="inputText"
+          rows="6"
+          autofocus
+          placeholder="Paste or type text to screen for risk…"
+          maxlength="10000"
+          class="w-full rounded-xl border border-[#d2d2d7] bg-[#fafafa] px-4 py-3 text-[15px] text-[#1d1d1f] placeholder-[#aeaeb2] focus:outline-none focus:ring-2 focus:ring-[#0071e3] focus:border-transparent transition"
+        ></textarea>
+
+        <!-- Character count -->
+        <div class="flex justify-between items-center mt-1.5 px-0.5">
+          <span id="charCount" class="text-[12px] text-[#aeaeb2]">0 / 10,000</span>
+        </div>
+
+        <!-- Sample inputs -->
+        <div class="mt-4">
+          <p class="text-[12px] font-medium text-[#aeaeb2] uppercase tracking-wide mb-2">Try a sample</p>
+          <div class="flex flex-wrap gap-2">
+            <button data-sample="safe"    class="sample-btn text-[13px] px-3 py-1.5 rounded-lg border border-[#d2d2d7] text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition">SAFE sample</button>
+            <button data-sample="warning" class="sample-btn text-[13px] px-3 py-1.5 rounded-lg border border-[#d2d2d7] text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition">WARNING sample</button>
+            <button data-sample="block"   class="sample-btn text-[13px] px-3 py-1.5 rounded-lg border border-[#d2d2d7] text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition">BLOCK sample</button>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-3 mt-6">
+          <button
+            id="checkBtn"
+            disabled
+            class="flex-1 sm:flex-none sm:w-36 h-11 rounded-xl bg-[#0071e3] text-white text-[15px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#0077ed] active:bg-[#006bdb] transition flex items-center justify-center gap-2"
+          >
+            <span id="btnLabel">Check Risk</span>
+            <svg id="spinner" class="hidden w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="white" stroke-width="3"/>
+              <path class="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+          </button>
+          <button
+            id="clearBtn"
+            class="h-11 px-5 rounded-xl border border-[#d2d2d7] text-[15px] font-medium text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition"
+          >Clear</button>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div id="resultDivider" class="hidden h-px bg-[#e5e5ea]"></div>
+
+      <!-- Result section -->
+      <div id="resultSection" class="hidden p-6 sm:p-8">
+
+        <!-- Error state -->
+        <div id="errorState" class="hidden rounded-xl bg-[#FFF2F1] border border-[#ffb3af] px-5 py-4">
+          <p class="text-[14px] font-medium text-[#c0130a]">Unable to reach the backend</p>
+          <p id="errorMsg" class="text-[13px] text-[#c0130a] opacity-80 mt-0.5">Make sure the server is running on localhost:8000.</p>
+        </div>
+
+        <!-- Success state -->
+        <div id="successState" class="hidden">
+          <!-- Status row -->
+          <div class="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <span id="statusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[13px] font-semibold tracking-wide"></span>
+              <p id="resultMessage" class="mt-2 text-[15px] text-[#1d1d1f]"></p>
+            </div>
+            <button
+              id="copyBtn"
+              class="shrink-0 h-9 px-4 rounded-lg border border-[#d2d2d7] text-[13px] font-medium text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition flex items-center gap-1.5"
+            >
+              <svg class="w-3.5 h-3.5 text-[#6e6e73]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+              Copy JSON
+            </button>
+          </div>
+
+          <!-- Findings list -->
+          <div id="findingsList" class="mt-5 space-y-2"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Disclaimer -->
+    <p class="mt-6 text-center text-[12px] text-[#aeaeb2] leading-relaxed max-w-lg mx-auto px-4">
+      This tool provides automated risk screening and does not constitute legal or regulatory advice.
+    </p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

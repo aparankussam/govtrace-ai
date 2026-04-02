@@ -3,8 +3,9 @@
   "configurations": [
     {
       "name": "GovTrace AI Guardrail",
-      "runtimeExecutable": "uvicorn",
-      "runtimeArgs": ["main:app", "--reload", "--port", "8000"],
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--reload", "--port", "8000"],
+      "cwd": "govtrace-api",
       "port": 8000
     },
     {

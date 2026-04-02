@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="GovTrace AI screens text for PII, prompt injection, and overclaim risk before it is sent to an AI system."
+  />
+  <link id="canonicalLink" rel="canonical" href="/" />
   <title>GovTrace AI — Risk Screener</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -103,9 +108,9 @@
       <div id="resultSection" class="hidden p-6 sm:p-8">
 
         <!-- Error state -->
-        <div id="errorState" class="hidden rounded-xl bg-[#FFF2F1] border border-[#ffb3af] px-5 py-4">
-          <p class="text-[14px] font-medium text-[#c0130a]">Unable to reach the backend</p>
-          <p id="errorMsg" class="text-[13px] text-[#c0130a] opacity-80 mt-0.5">Make sure the server is running on localhost:8000.</p>
+        <div id="errorState" class="hidden rounded-xl bg-[#FFF2F1] border border-[#ffb3af] px-5 py-4" aria-live="polite">
+          <p class="text-[14px] font-medium text-[#c0130a]">Risk check unavailable</p>
+          <p id="errorMsg" class="text-[13px] text-[#c0130a] opacity-80 mt-0.5">The risk check could not be completed. Please try again.</p>
         </div>
 
         <!-- Success state -->
@@ -142,6 +147,7 @@
     </p>
   </main>
 
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

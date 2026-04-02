@@ -1,4 +1,12 @@
-const API_BASE_URL = "http://localhost:8000";
+const DEFAULT_CONFIG = Object.freeze({
+  apiBaseUrl: "/api",
+  siteUrl: "",
+});
+
+const runtimeConfig = window.GOVTRACE_CONFIG ?? DEFAULT_CONFIG;
+const API_BASE_URL = normalizeApiBaseUrl(runtimeConfig.apiBaseUrl);
+const SITE_URL = normalizeSiteUrl(runtimeConfig.siteUrl);
+const REQUEST_TIMEOUT_MS = 12000;
 
 const SAMPLES = {
   safe: "The quarterly compliance report has been reviewed. All data handling procedures follow internal guidelines and no anomalies were found.",
@@ -27,6 +35,40 @@ let lastResponse  = null;
 let loading       = false;
 
 // --- Helpers ---
+
+function normalizeApiBaseUrl(value) {
+  if (typeof value !== "string") return DEFAULT_CONFIG.apiBaseUrl;
+
+  const trimmed = value.trim();
+  if (!trimmed) return DEFAULT_CONFIG.apiBaseUrl;
+
+  if (trimmed === "/") return "";
+
+  return trimmed.replace(/\/+$/, "");
+}
+
+function normalizeSiteUrl(value) {
+  if (typeof value !== "string") return "";
+
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed);
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function updateCanonicalUrl() {
+  if (!SITE_URL) return;
+
+  const canonicalLink = document.getElementById("canonicalLink");
+  if (canonicalLink) {
+    canonicalLink.href = SITE_URL;
+  }
+}
 
 function setLoading(on) {
   loading = on;
@@ -143,10 +185,59 @@ function renderError(msg) {
   lastResponse = null;
   successState.classList.add("hidden");
   errorState.classList.remove("hidden");
-  errorMsg.textContent = msg || "Make sure the server is running on localhost:8000.";
+  errorMsg.textContent = msg || "The risk check could not be completed. Please try again.";
+}
+
+async function getErrorMessage(res) {
+  const contentType = res.headers.get("content-type") ?? "";
+  const statusPrefix = `Request failed with status ${res.status}.`;
+
+  try {
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      const detail = Array.isArray(data?.detail)
+        ? data.detail.map((item) => item?.msg).filter(Boolean).join(" ")
+        : data?.detail;
+
+      if (detail) {
+        return `${statusPrefix} ${detail}`.trim();
+      }
+    }
+
+    const text = await res.text();
+    if (text) {
+      return `${statusPrefix} ${text}`.trim();
+    }
+  } catch {
+    // Fall through to generic messages below.
+  }
+
+  if (res.status >= 500) {
+    return "The GovTrace API is temporarily unavailable. Please try again in a moment.";
+  }
+
+  return statusPrefix;
+}
+
+async function postAudit(text) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${API_BASE_URL}/audit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 // --- Event listeners ---
+
+updateCanonicalUrl();
 
 inputText.addEventListener("input", () => {
   const len = inputText.value.length;
@@ -186,21 +277,21 @@ checkBtn.addEventListener("click", async () => {
   successState.classList.add("hidden");
 
   try {
-    const res = await fetch(`${API_BASE_URL}/audit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
+    const res = await postAudit(text);
 
     if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      renderError(`Server returned ${res.status}. ${detail}`.trim());
+      renderError(await getErrorMessage(res));
     } else {
       const data = await res.json();
       renderSuccess(data);
     }
   } catch (err) {
-    renderError("Could not connect to the backend. Make sure it is running on localhost:8000.");
+    const isAbort = err instanceof DOMException && err.name === "AbortError";
+    renderError(
+      isAbort
+        ? "The risk check timed out. Please try again."
+        : "The GovTrace API could not be reached. Please try again in a moment."
+    );
   } finally {
     setLoading(false);
   }

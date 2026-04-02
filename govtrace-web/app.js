@@ -421,7 +421,7 @@ function renderSuccess(data) {
   resultMeta.textContent = `${data.profile} profile • ${data.findings.length} finding${data.findings.length === 1 ? "" : "s"} detected`;
   resultCard.classList.add(meta.badgeClass);
   statusBadge.className = `inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] ${meta.badgeClass}`;
-  statusBadge.textContent = meta.badge;
+  statusBadge.innerHTML = `<span class="badge-dot" aria-hidden="true"></span><span>${escapeHtml(meta.badge)}</span>`;
   verdictHeading.textContent = meta.heading;
   resultMsg.textContent = data.message;
   operatorAction.textContent = meta.action;
@@ -442,7 +442,7 @@ function renderError(message) {
   resultMeta.textContent = "Service response";
   resultCard.classList.add("status-violation");
   statusBadge.className = "inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] status-violation";
-  statusBadge.textContent = "CHECK FAILED";
+  statusBadge.innerHTML = '<span class="badge-dot" aria-hidden="true"></span><span>CHECK FAILED</span>';
   verdictHeading.textContent = "RUN UNSUCCESSFUL";
   resultMsg.textContent = message || "The policy check could not be completed. Please try again.";
   operatorAction.textContent = "Retry the request";
@@ -461,7 +461,7 @@ function renderPending() {
   clearResultScreen();
   resultMeta.textContent = `${profileSelect.value} profile • analyzing payload`;
   statusBadge.className = "inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] status-review";
-  statusBadge.textContent = "RUNNING CHECK";
+  statusBadge.innerHTML = '<span class="badge-dot" aria-hidden="true"></span><span>RUNNING CHECK</span>';
   verdictHeading.textContent = "CHECKING CONTENT";
   resultMsg.textContent = "GovTraceAI is evaluating the payload for sensitive data, prompt injection, and risky claims.";
   operatorAction.textContent = "Stand by";

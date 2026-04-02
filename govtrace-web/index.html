@@ -107,25 +107,140 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
     }
 
-    .status-compliant {
-      background: rgba(61, 220, 151, 0.16);
-      color: #8bf0bf;
-      border-color: rgba(61, 220, 151, 0.28);
-      box-shadow: inset 0 0 32px rgba(61, 220, 151, 0.06);
+    #resultCard {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(11, 11, 14, 0.92), rgba(7, 7, 9, 0.98));
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 32px 80px rgba(0,0,0,0.42);
     }
 
-    .status-review {
-      background: rgba(255, 182, 72, 0.16);
-      color: #ffd28a;
-      border-color: rgba(255, 182, 72, 0.30);
-      box-shadow: inset 0 0 32px rgba(255, 182, 72, 0.06);
+    #resultCard::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.03), transparent 22%),
+        radial-gradient(circle at top right, rgba(255,255,255,0.03), transparent 34%);
+      pointer-events: none;
     }
 
-    .status-violation {
-      background: rgba(255, 107, 95, 0.16);
-      color: #ffafa6;
-      border-color: rgba(255, 107, 95, 0.30);
-      box-shadow: inset 0 0 32px rgba(255, 107, 95, 0.06);
+    #resultCard::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% 52% auto;
+      width: 22rem;
+      height: 22rem;
+      border-radius: 9999px;
+      opacity: 0.7;
+      filter: blur(38px);
+      pointer-events: none;
+    }
+
+    #statusBadge {
+      position: relative;
+      overflow: hidden;
+      gap: 0.6rem;
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      border-color: rgba(255,255,255,0.1);
+      color: #f4efe9;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .badge-dot {
+      height: 0.5rem;
+      width: 0.5rem;
+      border-radius: 9999px;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.02);
+    }
+
+    #verdictHeading {
+      color: #fcfaf7;
+      text-shadow: 0 8px 30px rgba(0,0,0,0.24);
+    }
+
+    #resultCard.status-compliant {
+      border-color: rgba(61, 220, 151, 0.14);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        inset 0 0 0 1px rgba(61, 220, 151, 0.05),
+        0 32px 80px rgba(0,0,0,0.42);
+    }
+
+    #resultCard.status-compliant::after {
+      background: radial-gradient(circle, rgba(61, 220, 151, 0.12), transparent 62%);
+    }
+
+    #statusBadge.status-compliant {
+      border-color: rgba(61, 220, 151, 0.18);
+      color: #c8f7de;
+      box-shadow: inset 0 0 0 1px rgba(61, 220, 151, 0.06), 0 10px 24px rgba(61, 220, 151, 0.08);
+    }
+
+    #statusBadge.status-compliant .badge-dot {
+      background: linear-gradient(180deg, #7ce7b3, #3ddc97);
+      box-shadow: 0 0 18px rgba(61, 220, 151, 0.35);
+    }
+
+    #resultCard.status-compliant #verdictHeading {
+      text-shadow: 0 10px 36px rgba(61, 220, 151, 0.08);
+    }
+
+    #resultCard.status-review {
+      border-color: rgba(255, 182, 72, 0.16);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        inset 0 0 0 1px rgba(255, 182, 72, 0.05),
+        0 32px 80px rgba(0,0,0,0.42);
+    }
+
+    #resultCard.status-review::after {
+      background: radial-gradient(circle, rgba(255, 182, 72, 0.14), transparent 62%);
+    }
+
+    #statusBadge.status-review {
+      border-color: rgba(255, 182, 72, 0.2);
+      color: #ffe1b0;
+      box-shadow: inset 0 0 0 1px rgba(255, 182, 72, 0.06), 0 10px 24px rgba(255, 182, 72, 0.08);
+    }
+
+    #statusBadge.status-review .badge-dot {
+      background: linear-gradient(180deg, #ffd081, #ffb648);
+      box-shadow: 0 0 18px rgba(255, 182, 72, 0.35);
+    }
+
+    #resultCard.status-review #verdictHeading {
+      text-shadow: 0 10px 36px rgba(255, 182, 72, 0.09);
+    }
+
+    #resultCard.status-violation {
+      border-color: rgba(255, 107, 95, 0.16);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        inset 0 0 0 1px rgba(255, 107, 95, 0.05),
+        0 32px 80px rgba(0,0,0,0.42);
+    }
+
+    #resultCard.status-violation::after {
+      background: radial-gradient(circle, rgba(255, 107, 95, 0.14), transparent 62%);
+    }
+
+    #statusBadge.status-violation {
+      border-color: rgba(255, 107, 95, 0.2);
+      color: #ffd0ca;
+      box-shadow: inset 0 0 0 1px rgba(255, 107, 95, 0.06), 0 10px 24px rgba(255, 107, 95, 0.08);
+    }
+
+    #statusBadge.status-violation .badge-dot {
+      background: linear-gradient(180deg, #ffb2aa, #ff6b5f);
+      box-shadow: 0 0 18px rgba(255, 107, 95, 0.35);
+    }
+
+    #resultCard.status-violation #verdictHeading {
+      text-shadow: 0 10px 36px rgba(255, 107, 95, 0.09);
     }
 
     .screen {
@@ -162,19 +277,54 @@
       transition: transform 0.22s ease;
     }
 
+    .finding-card {
+      position: relative;
+      overflow: hidden;
+      border-color: rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.028), rgba(255,255,255,0.012));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .finding-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 2px;
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+
     .finding-accent-compliant {
-      border-color: rgba(61, 220, 151, 0.22);
-      background: linear-gradient(180deg, rgba(61, 220, 151, 0.10), rgba(255, 255, 255, 0.02));
+      border-color: rgba(61, 220, 151, 0.14);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 0 1px rgba(61, 220, 151, 0.04);
+    }
+
+    .finding-accent-compliant::before {
+      opacity: 1;
+      background: linear-gradient(180deg, rgba(61, 220, 151, 0.2), rgba(61, 220, 151, 0.85), rgba(61, 220, 151, 0.16));
+      box-shadow: 0 0 16px rgba(61, 220, 151, 0.18);
     }
 
     .finding-accent-review {
-      border-color: rgba(255, 182, 72, 0.24);
-      background: linear-gradient(180deg, rgba(255, 182, 72, 0.10), rgba(255, 255, 255, 0.02));
+      border-color: rgba(255, 182, 72, 0.15);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 0 1px rgba(255, 182, 72, 0.04);
+    }
+
+    .finding-accent-review::before {
+      opacity: 1;
+      background: linear-gradient(180deg, rgba(255, 182, 72, 0.2), rgba(255, 182, 72, 0.88), rgba(255, 182, 72, 0.18));
+      box-shadow: 0 0 16px rgba(255, 182, 72, 0.2);
     }
 
     .finding-accent-violation {
-      border-color: rgba(255, 107, 95, 0.24);
-      background: linear-gradient(180deg, rgba(255, 107, 95, 0.10), rgba(255, 255, 255, 0.02));
+      border-color: rgba(255, 107, 95, 0.15);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 0 1px rgba(255, 107, 95, 0.04);
+    }
+
+    .finding-accent-violation::before {
+      opacity: 1;
+      background: linear-gradient(180deg, rgba(255, 107, 95, 0.2), rgba(255, 107, 95, 0.88), rgba(255, 107, 95, 0.18));
+      box-shadow: 0 0 16px rgba(255, 107, 95, 0.2);
     }
 
     .profile-trigger {

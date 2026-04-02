@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta
     name="description"
-    content="GovTraceAI Trust Layer delivers policy intelligence for production AI with fast verdicting for PII, prompt injection, and overclaim risk."
+    content="GovTraceAI delivers a fast AI policy check for sensitive data, prompt injection, and unsupported claims."
   />
   <link id="canonicalLink" rel="canonical" href="/" />
-  <title>GovTraceAI Trust Layer</title>
+  <title>GovTraceAI Policy Check</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -56,8 +56,8 @@
     body {
       -webkit-font-smoothing: antialiased;
       background:
-        radial-gradient(circle at top left, rgba(255, 107, 44, 0.20), transparent 34%),
-        radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.08), transparent 24%),
+        radial-gradient(circle at top left, rgba(255, 107, 44, 0.22), transparent 30%),
+        radial-gradient(circle at 85% 12%, rgba(255, 255, 255, 0.07), transparent 22%),
         linear-gradient(180deg, #070709 0%, #09090c 42%, #050506 100%);
     }
 
@@ -75,75 +75,6 @@
     .panel-inset {
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
       border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .accent-line {
-      background: linear-gradient(90deg, rgba(255, 107, 44, 0), rgba(255, 107, 44, 0.92), rgba(255, 178, 122, 0));
-    }
-
-    .hero-grid::before {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      border-radius: 32px;
-      padding: 1px;
-      background: linear-gradient(135deg, rgba(255, 107, 44, 0.44), rgba(255, 255, 255, 0.08), rgba(255, 107, 44, 0.12));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-    }
-
-    .signal-orb {
-      background:
-        radial-gradient(circle, rgba(255, 143, 77, 0.9) 0%, rgba(255, 107, 44, 0.45) 30%, rgba(255, 107, 44, 0.08) 58%, transparent 72%);
-      filter: blur(1px);
-      animation: pulse 5.8s ease-in-out infinite;
-    }
-
-    .floating-grid {
-      background-image:
-        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-      background-size: 42px 42px;
-      mask-image: linear-gradient(180deg, rgba(255,255,255,0.8), transparent);
-    }
-
-    .status-safe {
-      background: rgba(61, 220, 151, 0.14);
-      color: #8bf0bf;
-      border-color: rgba(61, 220, 151, 0.24);
-      box-shadow: inset 0 0 28px rgba(61, 220, 151, 0.05);
-    }
-
-    .status-warning {
-      background: rgba(255, 182, 72, 0.14);
-      color: #ffd28a;
-      border-color: rgba(255, 182, 72, 0.28);
-      box-shadow: inset 0 0 28px rgba(255, 182, 72, 0.05);
-    }
-
-    .status-block {
-      background: rgba(255, 107, 95, 0.14);
-      color: #ffafa6;
-      border-color: rgba(255, 107, 95, 0.28);
-      box-shadow: inset 0 0 28px rgba(255, 107, 95, 0.05);
-    }
-
-    .finding-body {
-      display: none;
-    }
-
-    .finding-open .finding-body {
-      display: block;
-    }
-
-    .finding-open .chevron {
-      transform: rotate(180deg);
-    }
-
-    .chevron {
-      transition: transform 0.22s ease;
     }
 
     .tab-active {
@@ -170,327 +101,300 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(0.94); opacity: 0.9; }
-      50% { transform: scale(1.06); opacity: 1; }
+    .status-compliant {
+      background: rgba(61, 220, 151, 0.16);
+      color: #8bf0bf;
+      border-color: rgba(61, 220, 151, 0.28);
+      box-shadow: inset 0 0 32px rgba(61, 220, 151, 0.06);
+    }
+
+    .status-review {
+      background: rgba(255, 182, 72, 0.16);
+      color: #ffd28a;
+      border-color: rgba(255, 182, 72, 0.30);
+      box-shadow: inset 0 0 32px rgba(255, 182, 72, 0.06);
+    }
+
+    .status-violation {
+      background: rgba(255, 107, 95, 0.16);
+      color: #ffafa6;
+      border-color: rgba(255, 107, 95, 0.30);
+      box-shadow: inset 0 0 32px rgba(255, 107, 95, 0.06);
+    }
+
+    .screen {
+      transition: opacity 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .screen-hidden {
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      transform: translateY(28px) scale(0.985);
+    }
+
+    .screen-active {
+      opacity: 1;
+      position: relative;
+      transform: translateY(0) scale(1);
+    }
+
+    .details-content {
+      display: none;
+    }
+
+    .details-open .details-content {
+      display: block;
+    }
+
+    .details-open .details-chevron {
+      transform: rotate(180deg);
+    }
+
+    .details-chevron {
+      transition: transform 0.22s ease;
+    }
+
+    .finding-accent-compliant {
+      border-color: rgba(61, 220, 151, 0.22);
+      background: linear-gradient(180deg, rgba(61, 220, 151, 0.10), rgba(255, 255, 255, 0.02));
+    }
+
+    .finding-accent-review {
+      border-color: rgba(255, 182, 72, 0.24);
+      background: linear-gradient(180deg, rgba(255, 182, 72, 0.10), rgba(255, 255, 255, 0.02));
+    }
+
+    .finding-accent-violation {
+      border-color: rgba(255, 107, 95, 0.24);
+      background: linear-gradient(180deg, rgba(255, 107, 95, 0.10), rgba(255, 255, 255, 0.02));
     }
   </style>
 </head>
 <body class="min-h-screen font-sans text-ink-50">
   <main class="relative overflow-hidden">
-    <div class="absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(circle_at_top,rgba(255,107,44,0.18),transparent_56%)] pointer-events-none"></div>
-    <div class="absolute right-[-12rem] top-20 h-96 w-96 rounded-full bg-ember-500/10 blur-3xl pointer-events-none"></div>
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-[30rem] bg-[radial-gradient(circle_at_top,rgba(255,107,44,0.18),transparent_56%)]"></div>
+    <div class="pointer-events-none absolute right-[-12rem] top-12 h-96 w-96 rounded-full bg-ember-500/10 blur-3xl"></div>
 
-    <div class="mx-auto max-w-7xl px-5 pb-12 pt-8 sm:px-8 sm:pb-16 lg:px-10">
-      <section class="relative hero-grid overflow-hidden rounded-[32px] panel-surface px-6 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
-        <div class="absolute inset-0 floating-grid opacity-25 pointer-events-none"></div>
-        <div class="absolute right-6 top-6 h-44 w-44 rounded-full signal-orb opacity-80 pointer-events-none"></div>
-
-        <div class="relative grid gap-8 lg:grid-cols-[1.3fr_0.9fr] lg:items-end">
-          <div>
-            <div class="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.32em] text-ink-100">
-              <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.85)]"></span>
-              GovTraceAI // Live Trust Layer
-            </div>
-            <div class="mt-6 max-w-3xl">
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-ember-300/85">Policy intelligence for production AI</p>
-              <h1 class="mt-4 text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-[3.7rem] lg:leading-[1.04]">
-                Govern prompts, uploads, and model-bound content before it reaches production.
+    <div class="mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
+      <div class="relative min-h-[calc(100vh-3rem)] overflow-hidden rounded-[34px] panel-surface">
+        <section id="inputScreen" class="screen screen-active flex min-h-[calc(100vh-3rem)] items-center justify-center px-5 py-8 sm:px-8 lg:px-10" aria-label="Input screen">
+          <div class="w-full max-w-4xl">
+            <div class="mx-auto max-w-3xl text-center">
+              <div class="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.32em] text-ink-100">
+                <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,0.85)]"></span>
+                GovTraceAI // Live Policy Check
+              </div>
+              <p class="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-ember-300/85">Input → Run → Result</p>
+              <h1 class="mt-4 text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-[4rem] lg:leading-[1.02]">
+                See the policy verdict instantly.
               </h1>
-              <p class="mt-5 max-w-2xl text-[15px] leading-7 text-ink-100 sm:text-[17px]">
-                GovTraceAI Trust Layer gives teams an executive-grade control surface for detecting sensitive data, prompt injection patterns, and unsupported claims before they enter live workflows.
+              <p class="mx-auto mt-5 max-w-2xl text-[15px] leading-7 text-ink-100 sm:text-[17px]">
+                Paste content or upload a text file to check for sensitive data, prompt injection, and risky claims before it reaches a live AI workflow.
               </p>
             </div>
 
-            <div class="mt-8 grid gap-3 sm:grid-cols-3">
-              <div class="panel-inset rounded-2xl p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Policy Intelligence</p>
-                <p class="mt-3 text-sm leading-6 text-ink-100">Surface the highest-risk content patterns in one pass with production-friendly verdicts.</p>
+            <div class="mx-auto mt-8 max-w-3xl rounded-[30px] panel-inset p-4 sm:p-5 lg:p-6">
+              <div class="flex flex-wrap items-center justify-center gap-3" role="tablist" aria-label="Input mode">
+                <button
+                  id="textModeBtn"
+                  type="button"
+                  class="input-mode-btn tab-active rounded-full border px-4 py-2 text-sm font-medium transition"
+                  data-mode="text"
+                  aria-selected="true"
+                >
+                  Paste text
+                </button>
+                <button
+                  id="uploadModeBtn"
+                  type="button"
+                  class="input-mode-btn tab-idle rounded-full border px-4 py-2 text-sm font-medium transition"
+                  data-mode="upload"
+                  aria-selected="false"
+                >
+                  Upload file
+                </button>
               </div>
-              <div class="panel-inset rounded-2xl p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Deployment Signal</p>
-                <p class="mt-3 text-sm leading-6 text-ink-100">Translate raw findings into SAFE, WARNING, or BLOCK guidance for operators and compliance owners.</p>
-              </div>
-              <div class="panel-inset rounded-2xl p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Embedded Ready</p>
-                <p class="mt-3 text-sm leading-6 text-ink-100">Designed to sit cleanly inside the Gobots ecosystem with dark-mode polish and iframe-safe delivery.</p>
-              </div>
-            </div>
-          </div>
 
-          <aside class="relative rounded-[28px] border border-white/10 bg-black/30 p-5 shadow-glow backdrop-blur-xl">
-            <div class="absolute inset-x-6 top-0 h-px accent-line"></div>
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-ink-300">Operations Snapshot</p>
-                <h2 class="mt-2 text-2xl font-semibold text-white">Executive signal in one view</h2>
-              </div>
-              <span class="rounded-full border border-ember-400/30 bg-ember-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-ember-300">Active</span>
-            </div>
-
-            <div class="mt-6 grid gap-3">
-              <div class="panel-inset rounded-2xl p-4">
-                <div class="flex items-center justify-between">
-                  <p class="text-sm font-medium text-white">Risk coverage</p>
-                  <span class="text-xs uppercase tracking-[0.2em] text-ink-300">Core</span>
-                </div>
-                <p class="mt-3 text-3xl font-semibold text-white">PII • Injection • Overclaim</p>
-              </div>
-              <div class="grid gap-3 sm:grid-cols-3">
-                <div class="panel-inset rounded-2xl p-4">
-                  <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Safe</p>
-                  <p class="mt-3 text-2xl font-semibold text-safe">Green-light</p>
-                </div>
-                <div class="panel-inset rounded-2xl p-4">
-                  <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Warning</p>
-                  <p class="mt-3 text-2xl font-semibold text-warning">Review</p>
-                </div>
-                <div class="panel-inset rounded-2xl p-4">
-                  <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Block</p>
-                  <p class="mt-3 text-2xl font-semibold text-block">Stop</p>
-                </div>
-              </div>
-              <div class="panel-inset rounded-2xl p-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Operator Guidance</p>
-                <p class="mt-3 text-sm leading-6 text-ink-100">
-                  Paste content or upload a text file to run a trust review. PDF intake is staged in the interface with a clear fallback until extraction is added.
-                </p>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section class="mt-8 rounded-[32px] panel-surface p-4 sm:p-5 lg:p-6">
-        <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div class="panel-inset rounded-[28px] p-5 sm:p-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Trust Review Workspace</p>
-                <h2 class="mt-3 text-2xl font-semibold text-white sm:text-[2rem]">Run a policy intelligence pass</h2>
-                <p class="mt-3 max-w-2xl text-sm leading-6 text-ink-100">
-                  Choose direct text input or upload a file. The same analysis flow stays intact, with a premium operator experience around it.
-                </p>
-              </div>
-              <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-100">Iframe-ready</span>
-            </div>
-
-            <div class="mt-6 flex flex-wrap gap-3" role="tablist" aria-label="Input mode">
-              <button
-                id="textModeBtn"
-                type="button"
-                class="input-mode-btn tab-active rounded-full border px-4 py-2 text-sm font-medium transition"
-                data-mode="text"
-                aria-selected="true"
-              >
-                Paste content
-              </button>
-              <button
-                id="uploadModeBtn"
-                type="button"
-                class="input-mode-btn tab-idle rounded-full border px-4 py-2 text-sm font-medium transition"
-                data-mode="upload"
-                aria-selected="false"
-              >
-                Upload file
-              </button>
-            </div>
-
-            <div id="textModePanel" class="input-panel mt-6">
-              <div class="rounded-[26px] border border-white/10 bg-black/20 p-4 sm:p-5">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <label for="inputText" class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Content Payload</label>
-                  <span id="charCount" class="text-xs font-medium text-ink-300">0 / 10,000</span>
-                </div>
-                <textarea
-                  id="inputText"
-                  rows="9"
-                  autofocus
-                  placeholder="Paste model prompts, generated output, or workflow text for a trust review."
-                  maxlength="10000"
-                  class="mt-4 w-full rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-4 text-[15px] leading-7 text-white placeholder:text-ink-500 focus:border-ember-400/50 focus:outline-none focus:ring-2 focus:ring-ember-400/25 transition"
-                ></textarea>
-              </div>
-            </div>
-
-            <div id="uploadModePanel" class="input-panel mt-6 hidden">
-              <div
-                id="uploadDropzone"
-                class="upload-idle rounded-[26px] border border-dashed p-5 transition"
-              >
-                <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">File Intake</p>
-                    <h3 class="mt-2 text-xl font-semibold text-white">Upload `.txt` now, stage `.pdf` next</h3>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-ink-100">
-                      Text files feed directly into the same trust review. PDF upload is available in the UI and returns a clean status message until extraction is added.
-                    </p>
+              <div id="textModePanel" class="mt-5">
+                <div class="rounded-[26px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <label for="inputText" class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Content</label>
+                    <span id="charCount" class="text-xs font-medium text-ink-300">0 / 10,000</span>
                   </div>
-                  <label for="fileInput" class="inline-flex cursor-pointer items-center justify-center rounded-full bg-ember-500 px-4 py-2.5 text-sm font-semibold text-white shadow-ember transition hover:bg-ember-400">
-                    Select file
-                  </label>
-                </div>
-
-                <input id="fileInput" type="file" accept=".txt,.pdf,text/plain,application/pdf" class="hidden" />
-
-                <div class="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-5">
-                  <p class="text-sm font-medium text-white">Drop a file here or click to browse.</p>
-                  <p class="mt-1 text-sm text-ink-300">Accepted formats: `.txt`, `.pdf`</p>
-
-                  <div id="fileStateEmpty" class="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-5">
-                    <p class="text-sm font-medium text-ink-100">No file selected yet</p>
-                    <p class="mt-1 text-sm text-ink-300">Upload a text file to route its extracted content into the analysis pipeline.</p>
-                  </div>
-
-                  <div id="fileStateLoaded" class="mt-5 hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p id="fileName" class="text-sm font-semibold text-white"></p>
-                        <p id="fileMeta" class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300"></p>
-                      </div>
-                      <button
-                        id="removeFileBtn"
-                        type="button"
-                        class="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-ink-100 transition hover:border-white/20 hover:bg-white/5"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <p id="fileStatusMsg" class="mt-4 text-sm leading-6 text-ink-100"></p>
-                    <div class="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Extracted Preview</p>
-                      <pre id="filePreview" class="mt-3 max-h-44 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-ink-100"></pre>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-6">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Quick-start payloads</p>
-              <div class="mt-3 flex flex-wrap gap-2.5">
-                <button data-sample="safe" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">SAFE sample</button>
-                <button data-sample="warning" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">WARNING sample</button>
-                <button data-sample="block" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">BLOCK sample</button>
-              </div>
-            </div>
-
-            <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                id="checkBtn"
-                type="button"
-                disabled
-                class="flex h-12 items-center justify-center gap-2 rounded-full bg-ember-500 px-6 text-sm font-semibold text-white shadow-ember transition hover:bg-ember-400 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <span id="btnLabel">Run Trust Review</span>
-                <svg id="spinner" class="hidden h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="white" stroke-width="3"></circle>
-                  <path class="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8H4z"></path>
-                </svg>
-              </button>
-              <button
-                id="clearBtn"
-                type="button"
-                class="h-12 rounded-full border border-white/10 bg-white/[0.03] px-6 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/[0.05]"
-              >
-                Reset workspace
-              </button>
-            </div>
-          </div>
-
-          <aside class="panel-inset rounded-[28px] p-5 sm:p-6">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Decision Console</p>
-                <h2 class="mt-3 text-2xl font-semibold text-white">Operational verdict</h2>
-              </div>
-              <button
-                id="copyBtn"
-                type="button"
-                class="h-10 rounded-full border border-white/10 bg-white/[0.03] px-4 text-xs font-semibold uppercase tracking-[0.24em] text-ink-100 transition hover:border-white/20 hover:bg-white/[0.05]"
-              >
-                Copy JSON
-              </button>
-            </div>
-
-            <div id="resultSection" class="mt-6">
-              <div id="emptyState" class="rounded-[24px] border border-white/10 bg-black/20 p-5">
-                <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-100">
-                  Awaiting payload
-                </span>
-                <h3 class="mt-4 text-2xl font-semibold text-white">Ready for a trust review</h3>
-                <p class="mt-3 text-sm leading-7 text-ink-100">
-                  Run an analysis to generate an executive verdict, detailed findings, and a clean export for downstream workflows.
-                </p>
-                <div class="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Verdict</p>
-                    <p class="mt-3 text-base font-semibold text-white">SAFE / WARNING / BLOCK</p>
-                  </div>
-                  <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Coverage</p>
-                    <p class="mt-3 text-base font-semibold text-white">Text and uploads</p>
-                  </div>
-                  <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                    <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Output</p>
-                    <p class="mt-3 text-base font-semibold text-white">Actionable findings</p>
-                  </div>
+                  <textarea
+                    id="inputText"
+                    rows="8"
+                    autofocus
+                    placeholder="Paste model prompts, generated output, customer text, or workflow content."
+                    maxlength="10000"
+                    class="mt-4 w-full rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-4 text-[15px] leading-7 text-white placeholder:text-ink-500 transition focus:border-ember-400/50 focus:outline-none focus:ring-2 focus:ring-ember-400/25"
+                  ></textarea>
                 </div>
               </div>
 
-              <div id="errorState" class="hidden rounded-[24px] border border-[#6e2f26] bg-[#2a130f]/90 p-5" aria-live="polite">
-                <span class="inline-flex items-center rounded-full border border-[#8c4438] bg-[#3a1712] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#ffb1a7]">
-                  Service interrupted
-                </span>
-                <p class="mt-4 text-xl font-semibold text-white">Trust review unavailable</p>
-                <p id="errorMsg" class="mt-3 text-sm leading-7 text-[#ffc2bb]">The trust review could not be completed. Please try again.</p>
-              </div>
-
-              <div id="successState" class="hidden">
-                <div class="rounded-[24px] border border-white/10 bg-black/20 p-5">
-                  <div class="flex flex-wrap items-start justify-between gap-4">
+              <div id="uploadModePanel" class="mt-5 hidden">
+                <div id="uploadDropzone" class="upload-idle rounded-[26px] border border-dashed p-5 transition">
+                  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <span id="statusBadge" class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold tracking-[0.06em]"></span>
-                      <p id="resultMessage" class="mt-4 text-xl font-semibold text-white"></p>
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">File upload</p>
+                      <h2 class="mt-2 text-2xl font-semibold text-white">Drop a `.txt` file to run the same check</h2>
+                      <p class="mt-2 max-w-xl text-sm leading-6 text-ink-100">
+                        Text files are analyzed immediately. PDF upload stays visible here and returns a clear “coming soon” message until extraction is added.
+                      </p>
                     </div>
-                    <div class="min-w-[13rem] rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-300">Decision posture</p>
-                      <p id="executiveSummary" class="mt-3 text-sm leading-6 text-ink-100"></p>
-                    </div>
+                    <label for="fileInput" class="inline-flex cursor-pointer items-center justify-center rounded-full bg-ember-500 px-4 py-2.5 text-sm font-semibold text-white shadow-ember transition hover:bg-ember-400">
+                      Select file
+                    </label>
                   </div>
 
-                  <div class="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Findings</p>
-                      <p id="findingCount" class="mt-3 text-2xl font-semibold text-white">0</p>
-                    </div>
-                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Highest severity</p>
-                      <p id="highestSeverity" class="mt-3 text-2xl font-semibold text-white">None</p>
-                    </div>
-                    <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p class="text-[11px] uppercase tracking-[0.22em] text-ink-300">Operator action</p>
-                      <p id="operatorAction" class="mt-3 text-sm font-semibold leading-6 text-white">No action required</p>
-                    </div>
-                  </div>
+                  <input id="fileInput" type="file" accept=".txt,.pdf,text/plain,application/pdf" class="hidden" />
 
-                  <div class="mt-6">
-                    <div class="flex items-center justify-between gap-3">
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Detailed findings</p>
-                      <span class="text-xs text-ink-300">Expandable cards</span>
+                  <div class="mt-5 rounded-[22px] border border-white/10 bg-black/20 p-5">
+                    <div id="fileStateEmpty" class="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-5">
+                      <p class="text-sm font-medium text-ink-100">No file selected yet</p>
+                      <p class="mt-1 text-sm text-ink-300">Accepted formats: `.txt`, `.pdf`.</p>
                     </div>
-                    <div id="findingsList" class="mt-4 space-y-3"></div>
+
+                    <div id="fileStateLoaded" class="hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                      <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p id="fileName" class="text-sm font-semibold text-white"></p>
+                          <p id="fileMeta" class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300"></p>
+                        </div>
+                        <button
+                          id="removeFileBtn"
+                          type="button"
+                          class="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-ink-100 transition hover:border-white/20 hover:bg-white/5"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <p id="fileStatusMsg" class="mt-4 text-sm leading-6 text-ink-100"></p>
+                      <div class="mt-4 rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Preview</p>
+                        <pre id="filePreview" class="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-ink-100"></pre>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </aside>
-        </div>
-      </section>
 
-      <p class="mx-auto mt-6 max-w-3xl text-center text-xs leading-6 text-ink-300 sm:text-sm">
-        GovTraceAI provides automated policy intelligence and does not constitute legal or regulatory advice.
-      </p>
+              <div class="mt-5">
+                <p class="text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Try a sample</p>
+                <div class="mt-3 flex flex-wrap justify-center gap-2.5">
+                  <button data-sample="safe" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">SAFE</button>
+                  <button data-sample="warning" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">WARNING</button>
+                  <button data-sample="block" class="sample-btn rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-ink-100 transition hover:border-ember-400/35 hover:bg-ember-500/10">BLOCK</button>
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-center">
+                <button
+                  id="checkBtn"
+                  type="button"
+                  disabled
+                  class="flex h-14 min-w-[16rem] items-center justify-center gap-2 rounded-full bg-ember-500 px-7 text-sm font-semibold text-white shadow-ember transition hover:bg-ember-400 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <span id="btnLabel">Run Policy Check</span>
+                  <svg id="spinner" class="hidden h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="white" stroke-width="3"></circle>
+                    <path class="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8H4z"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <p class="mx-auto mt-5 max-w-2xl text-center text-xs leading-6 text-ink-300 sm:text-sm">
+              GovTraceAI provides automated policy intelligence and does not constitute legal or regulatory advice.
+            </p>
+          </div>
+        </section>
+
+        <section id="resultScreen" class="screen screen-hidden flex min-h-[calc(100vh-3rem)] items-center px-5 py-6 sm:px-8 lg:px-10" aria-label="Result screen">
+          <div class="mx-auto w-full max-w-5xl">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <button
+                id="backBtn"
+                type="button"
+                class="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/[0.05]"
+              >
+                New check
+              </button>
+              <div id="resultMeta" class="text-right text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300"></div>
+            </div>
+
+            <div id="resultCard" class="rounded-[32px] border border-white/10 bg-black/25 p-5 shadow-glow sm:p-7 lg:p-8">
+              <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.32em] text-ink-300">GovTraceAI verdict</p>
+                  <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <span id="statusBadge" class="inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em]"></span>
+                  </div>
+                  <h2 id="verdictHeading" class="mt-5 text-4xl font-semibold leading-none text-white sm:text-5xl lg:text-[4.4rem]"></h2>
+                  <p id="resultMessage" class="mt-5 max-w-2xl text-lg leading-8 text-ink-100"></p>
+                </div>
+
+                <div class="panel-inset rounded-[28px] p-5">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-ink-300">Operator action</p>
+                  <p id="operatorAction" class="mt-3 text-2xl font-semibold leading-tight text-white"></p>
+                  <p id="operatorSupport" class="mt-3 text-sm leading-6 text-ink-100"></p>
+                </div>
+              </div>
+
+              <div class="mt-6 grid gap-4 lg:grid-cols-3">
+                <article id="findingCard1" class="finding-card rounded-[24px] border p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Key finding</p>
+                  <h3 class="mt-3 text-lg font-semibold text-white"></h3>
+                  <p class="mt-2 text-sm leading-6 text-ink-100"></p>
+                </article>
+                <article id="findingCard2" class="finding-card rounded-[24px] border p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Key finding</p>
+                  <h3 class="mt-3 text-lg font-semibold text-white"></h3>
+                  <p class="mt-2 text-sm leading-6 text-ink-100"></p>
+                </article>
+                <article id="findingCard3" class="finding-card rounded-[24px] border p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Key finding</p>
+                  <h3 class="mt-3 text-lg font-semibold text-white"></h3>
+                  <p class="mt-2 text-sm leading-6 text-ink-100"></p>
+                </article>
+              </div>
+
+              <div id="detailsSection" class="mt-6 rounded-[24px] border border-white/10 bg-white/[0.03]">
+                <button
+                  id="detailsToggle"
+                  type="button"
+                  class="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+                  aria-expanded="false"
+                >
+                  <div>
+                    <p class="text-sm font-semibold text-white">View details</p>
+                    <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">Expanded findings and response JSON</p>
+                  </div>
+                  <svg class="details-chevron h-4 w-4 shrink-0 text-ink-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                <div class="details-content border-t border-white/10 px-4 py-4">
+                  <div id="detailsFindings" class="space-y-3"></div>
+                  <div class="mt-4 flex items-center justify-between gap-3">
+                    <p class="text-xs uppercase tracking-[0.22em] text-ink-300">Raw response</p>
+                    <button
+                      id="copyBtn"
+                      type="button"
+                      class="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-ink-100 transition hover:border-white/20 hover:bg-white/[0.05]"
+                    >
+                      Copy JSON
+                    </button>
+                  </div>
+                  <pre id="jsonPreview" class="mt-3 max-h-44 overflow-auto rounded-2xl border border-white/10 bg-black/30 p-4 text-xs leading-6 text-ink-100"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 

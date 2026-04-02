@@ -157,6 +157,28 @@
       box-shadow: 0 0 0 4px rgba(255,255,255,0.02);
     }
 
+    @keyframes verdict-pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.94;
+      }
+      50% {
+        transform: scale(1.12);
+        opacity: 1;
+      }
+    }
+
+    @keyframes verdict-breathe {
+      0%, 100% {
+        opacity: 0.82;
+        filter: saturate(0.96);
+      }
+      50% {
+        opacity: 1;
+        filter: saturate(1);
+      }
+    }
+
     #verdictHeading {
       color: #fcfaf7;
       text-shadow: 0 8px 30px rgba(0,0,0,0.24);
@@ -210,6 +232,7 @@
     #statusBadge.status-review .badge-dot {
       background: linear-gradient(180deg, #ffd081, #ffb648);
       box-shadow: 0 0 18px rgba(255, 182, 72, 0.35);
+      animation: verdict-breathe 3.6s ease-in-out infinite;
     }
 
     #resultCard.status-review #verdictHeading {
@@ -237,6 +260,7 @@
     #statusBadge.status-violation .badge-dot {
       background: linear-gradient(180deg, #ffb2aa, #ff6b5f);
       box-shadow: 0 0 18px rgba(255, 107, 95, 0.35);
+      animation: verdict-pulse 2.2s ease-in-out infinite;
     }
 
     #resultCard.status-violation #verdictHeading {

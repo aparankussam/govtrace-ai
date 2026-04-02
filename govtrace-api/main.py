@@ -5,10 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
-    from .engine import analyze, verdict
+    from .engine import analyze, build_redacted_preview, normalize_profile, summarize_risk, verdict
     from .models import AuditRequest, AuditResponse
 except ImportError:
-    from engine import analyze, verdict
+    from engine import analyze, build_redacted_preview, normalize_profile, summarize_risk, verdict
     from models import AuditRequest, AuditResponse
 
 
@@ -86,6 +86,18 @@ def health():
 
 @app.post("/audit", response_model=AuditResponse)
 def audit(req: AuditRequest) -> AuditResponse:
-    findings = analyze(req.text)
+    profile = normalize_profile(req.profile)
+    findings = analyze(req.text, profile)
     status, message = verdict(findings)
-    return AuditResponse(status=status, message=message, findings=findings)
+    overall_severity, overall_confidence, overall_confidence_label = summarize_risk(findings)
+    redacted_preview = build_redacted_preview(req.text) if status != "COMPLIANT" else None
+    return AuditResponse(
+        profile=profile,
+        status=status,
+        message=message,
+        overall_severity=overall_severity,
+        overall_confidence=overall_confidence,
+        overall_confidence_label=overall_confidence_label,
+        redacted_preview=redacted_preview,
+        findings=findings,
+    )

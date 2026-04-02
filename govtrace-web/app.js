@@ -65,10 +65,12 @@ const jsonPreview = document.getElementById("jsonPreview");
 const copyBtn = document.getElementById("copyBtn");
 const textModeBtn = document.getElementById("textModeBtn");
 const uploadModeBtn = document.getElementById("uploadModeBtn");
+const profileSelect = document.getElementById("profileSelect");
 const textModePanel = document.getElementById("textModePanel");
 const uploadModePanel = document.getElementById("uploadModePanel");
 const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
+const selectFileBtn = document.getElementById("selectFileBtn");
 const fileStateEmpty = document.getElementById("fileStateEmpty");
 const fileStateLoaded = document.getElementById("fileStateLoaded");
 const fileName = document.getElementById("fileName");
@@ -76,6 +78,10 @@ const fileMeta = document.getElementById("fileMeta");
 const fileStatusMsg = document.getElementById("fileStatusMsg");
 const filePreview = document.getElementById("filePreview");
 const removeFileBtn = document.getElementById("removeFileBtn");
+const overallSeverity = document.getElementById("overallSeverity");
+const overallConfidence = document.getElementById("overallConfidence");
+const redactionSection = document.getElementById("redactionSection");
+const redactedPreview = document.getElementById("redactedPreview");
 const findingCards = Array.from(document.querySelectorAll(".finding-card"));
 
 let lastResponse = null;
@@ -158,6 +164,10 @@ function clearResultScreen() {
   resultMsg.textContent = "";
   operatorAction.textContent = "";
   operatorSupport.textContent = "";
+  overallSeverity.textContent = "";
+  overallConfidence.textContent = "";
+  redactedPreview.textContent = "";
+  redactionSection.classList.add("hidden");
   detailsFindings.innerHTML = "";
   jsonPreview.textContent = "";
   detailsSection.classList.remove("details-open");
@@ -279,12 +289,15 @@ async function handleFileSelection(file) {
 }
 
 function summarizeFinding(finding) {
-  const type = finding.type ?? "Signal";
+  const type = finding.reason_label ?? finding.type ?? "Signal";
   const rationale = finding.rationale ?? "Potential issue detected.";
-  const example = finding.example ? ` Example: ${finding.example}` : "";
+  const support = [];
+  if (finding.severity) support.push(`Severity ${finding.severity}`);
+  if (finding.confidence_label) support.push(finding.confidence_label);
+  if (finding.example) support.push(`Example: ${finding.example}`);
   return {
     title: type,
-    body: `${rationale}${example}`,
+    body: `${rationale}${support.length ? ` ${support.join(" • ")}.` : ""}`,
   };
 }
 
@@ -352,8 +365,9 @@ function renderDetails(data) {
     item.innerHTML = `
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-sm font-semibold text-white">${escapeHtml(finding.type ?? "Signal")}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">${escapeHtml((finding.severity ?? "low").toUpperCase())} confidence ${confidencePct}%</p>
+          <p class="text-sm font-semibold text-white">${escapeHtml(finding.reason_label ?? finding.type ?? "Signal")}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">Reason code: ${escapeHtml(finding.reason_label ?? finding.reason_code ?? "")}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">${escapeHtml((finding.severity ?? "low").toUpperCase())} • ${escapeHtml(finding.confidence_label ?? "Confidence")} ${confidencePct}%</p>
         </div>
       </div>
       <p class="mt-3 text-sm leading-6 text-ink-100">${escapeHtml(finding.rationale ?? "")}</p>
@@ -372,7 +386,7 @@ function renderSuccess(data) {
 
   clearResultScreen();
   lastResponse = data;
-  resultMeta.textContent = `${data.findings.length} finding${data.findings.length === 1 ? "" : "s"} detected`;
+  resultMeta.textContent = `${data.profile} profile • ${data.findings.length} finding${data.findings.length === 1 ? "" : "s"} detected`;
   resultCard.classList.add(meta.badgeClass);
   statusBadge.className = `inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] ${meta.badgeClass}`;
   statusBadge.textContent = meta.badge;
@@ -380,6 +394,12 @@ function renderSuccess(data) {
   resultMsg.textContent = data.message;
   operatorAction.textContent = meta.action;
   operatorSupport.textContent = meta.support;
+  overallSeverity.textContent = String(data.overall_severity ?? "low").toUpperCase();
+  overallConfidence.textContent = `${data.overall_confidence_label ?? "Confidence"} ${Math.round((data.overall_confidence ?? 0) * 100)}%`;
+  if (data.redacted_preview) {
+    redactedPreview.textContent = data.redacted_preview;
+    redactionSection.classList.remove("hidden");
+  }
   renderTopFindings(data, meta);
   renderDetails(data);
   swapScreens(true);
@@ -395,6 +415,8 @@ function renderError(message) {
   resultMsg.textContent = message || "The policy check could not be completed. Please try again.";
   operatorAction.textContent = "Retry the request";
   operatorSupport.textContent = "The API did not return a valid result for this run.";
+  overallSeverity.textContent = "UNKNOWN";
+  overallConfidence.textContent = "No score available";
   findingCards[0].classList.add("finding-accent-violation");
   findingCards[0].querySelector("h3").textContent = "No verdict available";
   findingCards[0].querySelector("p:last-child").textContent = "A system response was not returned, so this payload still needs review.";
@@ -405,13 +427,15 @@ function renderError(message) {
 
 function renderPending() {
   clearResultScreen();
-  resultMeta.textContent = "Analyzing payload";
+  resultMeta.textContent = `${profileSelect.value} profile • analyzing payload`;
   statusBadge.className = "inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] status-review";
   statusBadge.textContent = "RUNNING CHECK";
   verdictHeading.textContent = "CHECKING CONTENT";
   resultMsg.textContent = "GovTraceAI is evaluating the payload for sensitive data, prompt injection, and risky claims.";
   operatorAction.textContent = "Stand by";
   operatorSupport.textContent = "The result screen appears immediately so the response feels like a system action, not an inline page update.";
+  overallSeverity.textContent = "SCANNING";
+  overallConfidence.textContent = "Building result";
   findingCards[0].classList.add("finding-accent-review");
   findingCards[0].querySelector("h3").textContent = "Scanning policy signals";
   findingCards[0].querySelector("p:last-child").textContent = "Looking for identity data, contact information, location details, adversarial prompts, and unsupported certainty language.";
@@ -459,7 +483,7 @@ async function postAudit(text) {
     return await fetch(`${API_BASE_URL}/audit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, profile: profileSelect.value }),
       signal: controller.signal,
     });
   } finally {
@@ -513,8 +537,16 @@ fileInput.addEventListener("change", async (event) => {
   }
 });
 
+selectFileBtn.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  fileInput.click();
+});
+
 uploadDropzone.addEventListener("click", (event) => {
-  if (event.target === removeFileBtn) return;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.closest("#selectFileBtn") || target.closest("#removeFileBtn")) return;
   fileInput.click();
 });
 

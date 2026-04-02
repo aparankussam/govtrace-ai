@@ -1,4 +1,5 @@
 import re
+from typing import Iterable, Optional
 
 try:
     from .models import Finding
@@ -6,8 +7,8 @@ except ImportError:
     from models import Finding
 
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
-_SSN = re.compile(r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b")
-_PHONE = re.compile(r"(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b")
+_SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+_PHONE = re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}(?!\d)")
 _DOB = re.compile(
     r"\b(?:dob|date of birth|born)\s*[:\-]?\s*(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|"
     r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b",
@@ -34,8 +35,69 @@ _OVERCLAIM = re.compile(
     r"\b(?:guaranteed|proven fact|always|never|no doubt|unquestionably|certainly compliant|risk free)\b",
     re.IGNORECASE,
 )
+_CREDIT_CARD = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
+_BANK_ACCOUNT = re.compile(r"\b(?:account number|acct(?:ount)?|routing)\s*[:#-]?\s*\d{6,17}\b", re.IGNORECASE)
+_HEALTH_DATA = re.compile(
+    r"\b(?:patient|diagnosis|diagnosed|treatment|medication|prescription|mrn|medical record|phi|hipaa)\b",
+    re.IGNORECASE,
+)
 
 INPUT_LIMIT = 10_000
+
+PROFILE_ALIASES = {
+    "general": "General",
+    "public sector": "Public Sector",
+    "public_sector": "Public Sector",
+    "healthcare": "Healthcare",
+    "finance": "Finance",
+}
+
+REASON_LABELS = {
+    "PII": "PII detected",
+    "FINANCIAL": "Financial data detected",
+    "HEALTH": "Health data detected",
+    "PROMPT_INJECTION": "Prompt injection attempt",
+    "UNSUPPORTED_CLAIM": "Unsupported claim",
+}
+
+PROFILE_RULES = {
+    "General": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
+    "Public Sector": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
+    "Healthcare": {"health_confidence_boost": 0.06, "financial_confidence_boost": 0.0},
+    "Finance": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.06},
+}
+
+
+def normalize_profile(profile: Optional[str]) -> str:
+    if not profile:
+        return "General"
+
+    cleaned = profile.strip().lower()
+    return PROFILE_ALIASES.get(cleaned, "General")
+
+
+def _clip_confidence(value: float) -> float:
+    return max(0.0, min(0.99, round(value, 2)))
+
+
+def _confidence_label(value: float) -> str:
+    if value >= 0.93:
+        return "High confidence"
+    if value >= 0.8:
+        return "Moderate confidence"
+    return "Low confidence"
+
+
+def _severity_rank(value: str) -> int:
+    return {"low": 1, "medium": 2, "high": 3}.get(value, 0)
+
+
+def _overall_severity(findings: list[Finding]) -> str:
+    if any(f.severity == "high" for f in findings):
+        return "high"
+    if any(f.severity == "medium" for f in findings):
+        return "medium"
+    return "low"
 
 
 def _snippet(text: str, start: int, end: int, padding: int = 18) -> str:
@@ -63,27 +125,68 @@ def _mask_phone(value: str) -> str:
     return "***-***-****"
 
 
-def _dedupe(findings: list[Finding]) -> list[Finding]:
-    seen: set[tuple[str, str]] = set()
+def _mask_address(value: str) -> str:
+    parts = value.split()
+    if len(parts) < 3:
+        return "[address redacted]"
+    return f"{parts[0]} {' '.join(parts[1:3])} [redacted]"
+
+
+def _mask_credit_card(value: str) -> str:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) < 4:
+        return "****"
+    return f"**** **** **** {digits[-4:]}"
+
+
+def _dedupe(findings: Iterable[Finding]) -> list[Finding]:
+    seen: set[tuple[str, str, str]] = set()
     unique: list[Finding] = []
 
     for finding in findings:
-        key = (finding.type, finding.example)
+        key = (finding.type, finding.reason_code, finding.example)
         if key in seen:
             continue
         seen.add(key)
         unique.append(finding)
 
-    return unique
+    return sorted(unique, key=lambda finding: (-_severity_rank(finding.severity), -finding.confidence, finding.type))
 
 
-def analyze(text: str) -> list[Finding]:
+def _make_finding(
+    *,
+    type: str,
+    reason_code: str,
+    severity: str,
+    confidence: float,
+    example: str,
+    rationale: str,
+    recommended_action: str,
+) -> Finding:
+    confidence = _clip_confidence(confidence)
+    return Finding(
+        type=type,
+        reason_code=reason_code,
+        reason_label=REASON_LABELS[reason_code],
+        severity=severity,
+        confidence=confidence,
+        confidence_label=_confidence_label(confidence),
+        example=example,
+        rationale=rationale,
+        recommended_action=recommended_action,
+    )
+
+
+def analyze(text: str, profile: str = "General") -> list[Finding]:
     text = text[:INPUT_LIMIT]
+    profile = normalize_profile(profile)
+    profile_rules = PROFILE_RULES[profile]
     findings: list[Finding] = []
 
     for match in _EMAIL.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="EMAIL ADDRESS",
+            reason_code="PII",
             severity="high",
             confidence=0.96,
             example=_mask_email(match.group()),
@@ -92,8 +195,9 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _SSN.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="SOCIAL SECURITY NUMBER",
+            reason_code="PII",
             severity="high",
             confidence=0.99,
             example=_mask_ssn(match.group()),
@@ -102,8 +206,9 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _PHONE.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="PHONE NUMBER",
+            reason_code="PII",
             severity="medium",
             confidence=0.90,
             example=_mask_phone(match.group()),
@@ -112,8 +217,9 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _STREET_ADDRESS.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="STREET ADDRESS",
+            reason_code="PII",
             severity="medium",
             confidence=0.88,
             example=_snippet(text, match.start(), match.end()),
@@ -122,8 +228,9 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _CITY_STATE_ZIP.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="LOCATION DETAIL",
+            reason_code="PII",
             severity="medium",
             confidence=0.82,
             example=match.group(),
@@ -142,8 +249,9 @@ def analyze(text: str) -> list[Finding]:
             name_match = person_match
 
     if dob_match and name_match:
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="NAME + DOB COMBINATION",
+            reason_code="PII",
             severity="high",
             confidence=0.97,
             example=f"{name_match.group(1)} / {dob_match.group().strip()}",
@@ -151,8 +259,9 @@ def analyze(text: str) -> list[Finding]:
             recommended_action="Block or heavily redact personal identity details before proceeding.",
         ))
     elif dob_match:
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="DATE OF BIRTH",
+            reason_code="PII",
             severity="medium",
             confidence=0.91,
             example=dob_match.group().strip(),
@@ -161,8 +270,9 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _INJECTION.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="PROMPT INJECTION",
+            reason_code="PROMPT_INJECTION",
             severity="high",
             confidence=0.99,
             example=match.group(),
@@ -171,13 +281,48 @@ def analyze(text: str) -> list[Finding]:
         ))
 
     for match in _OVERCLAIM.finditer(text):
-        findings.append(Finding(
+        findings.append(_make_finding(
             type="OVERCLAIM LANGUAGE",
+            reason_code="UNSUPPORTED_CLAIM",
             severity="medium",
             confidence=0.83,
             example=match.group(),
             rationale="Absolute certainty language can create policy or trust risk and should be qualified.",
             recommended_action="Route to review and replace absolute claims with evidence-backed wording.",
+        ))
+
+    for match in _CREDIT_CARD.finditer(text):
+        findings.append(_make_finding(
+            type="CREDIT CARD NUMBER",
+            reason_code="FINANCIAL",
+            severity="high",
+            confidence=0.95 + profile_rules["financial_confidence_boost"],
+            example=_mask_credit_card(match.group()),
+            rationale="A payment card pattern was detected in the submitted content.",
+            recommended_action="Remove the card number or replace it with a tokenized value.",
+        ))
+
+    for match in _BANK_ACCOUNT.finditer(text):
+        findings.append(_make_finding(
+            type="BANK ACCOUNT DETAIL",
+            reason_code="FINANCIAL",
+            severity="high" if profile == "Finance" else "medium",
+            confidence=0.89 + profile_rules["financial_confidence_boost"],
+            example=match.group(),
+            rationale="Banking or routing details were detected and can expose sensitive financial data.",
+            recommended_action="Block or redact the account details before this content is shared.",
+        ))
+
+    for match in _HEALTH_DATA.finditer(text):
+        severity = "high" if profile == "Healthcare" and match.group().lower() in {"phi", "hipaa", "medical record", "mrn"} else "medium"
+        findings.append(_make_finding(
+            type="HEALTH DATA SIGNAL",
+            reason_code="HEALTH",
+            severity=severity,
+            confidence=0.84 + profile_rules["health_confidence_boost"],
+            example=match.group(),
+            rationale="Healthcare-oriented language suggests the content may contain patient or protected health information.",
+            recommended_action="Review for PHI exposure and redact medical details before use.",
         ))
 
     return _dedupe(findings)
@@ -200,3 +345,31 @@ def verdict(findings: list[Finding]) -> tuple[str, str]:
         "COMPLIANT",
         "No sensitive data, prompt injection, or unsupported claims were detected in this policy check.",
     )
+
+
+def summarize_risk(findings: list[Finding]) -> tuple[str, float, str]:
+    if not findings:
+        confidence = 0.98
+        return ("low", confidence, _confidence_label(confidence))
+
+    confidence = max(f.confidence for f in findings)
+    severity = _overall_severity(findings)
+    return (severity, confidence, _confidence_label(confidence))
+
+
+def build_redacted_preview(text: str) -> Optional[str]:
+    redacted = text[:INPUT_LIMIT]
+
+    replacements = [
+        (_EMAIL, lambda match: _mask_email(match.group())),
+        (_SSN, lambda match: _mask_ssn(match.group())),
+        (_PHONE, lambda match: _mask_phone(match.group())),
+        (_STREET_ADDRESS, lambda match: _mask_address(match.group())),
+        (_CREDIT_CARD, lambda match: _mask_credit_card(match.group())),
+        (_BANK_ACCOUNT, lambda match: "[financial account redacted]"),
+    ]
+
+    for pattern, repl in replacements:
+        redacted = pattern.sub(repl, redacted)
+
+    return redacted if redacted != text[:INPUT_LIMIT] else None

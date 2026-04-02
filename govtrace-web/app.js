@@ -66,6 +66,10 @@ const copyBtn = document.getElementById("copyBtn");
 const textModeBtn = document.getElementById("textModeBtn");
 const uploadModeBtn = document.getElementById("uploadModeBtn");
 const profileSelect = document.getElementById("profileSelect");
+const profileTrigger = document.getElementById("profileTrigger");
+const profileValue = document.getElementById("profileValue");
+const profileMenu = document.getElementById("profileMenu");
+const profileOptions = Array.from(document.querySelectorAll(".profile-option"));
 const textModePanel = document.getElementById("textModePanel");
 const uploadModePanel = document.getElementById("uploadModePanel");
 const fileInput = document.getElementById("fileInput");
@@ -94,6 +98,25 @@ let uploadedPayload = {
   preview: "",
   canAnalyze: false,
 };
+
+function setProfile(profile) {
+  profileSelect.value = profile;
+  profileValue.textContent = profile;
+  profileOptions.forEach((option) => {
+    option.setAttribute("aria-selected", String(option.dataset.profile === profile));
+  });
+}
+
+function closeProfileMenu() {
+  profileMenu.classList.add("menu-hidden");
+  profileTrigger.setAttribute("aria-expanded", "false");
+}
+
+function toggleProfileMenu() {
+  const isOpen = !profileMenu.classList.contains("menu-hidden");
+  profileMenu.classList.toggle("menu-hidden", isOpen);
+  profileTrigger.setAttribute("aria-expanded", String(!isOpen));
+}
 
 function normalizeApiBaseUrl(value) {
   if (typeof value !== "string") return DEFAULT_CONFIG.apiBaseUrl;
@@ -232,6 +255,15 @@ function resetUploadedPayload() {
   uploadDropzone.classList.add("upload-idle");
 
   syncActionState();
+}
+
+function resetInputState() {
+  inputText.value = "";
+  updateCharCount();
+  resetUploadedPayload();
+  setProfile("General");
+  closeProfileMenu();
+  setMode("text");
 }
 
 function renderUploadedPayload() {
@@ -492,6 +524,7 @@ async function postAudit(text) {
 }
 
 function resetExperience() {
+  resetInputState();
   clearResultScreen();
   swapScreens(false);
 }
@@ -499,6 +532,7 @@ function resetExperience() {
 updateCanonicalUrl();
 updateCharCount();
 syncActionState();
+setProfile(profileSelect.value || "General");
 resetExperience();
 
 inputText.addEventListener("input", () => {
@@ -513,6 +547,31 @@ textModeBtn.addEventListener("click", () => {
 
 uploadModeBtn.addEventListener("click", () => {
   setMode("upload");
+});
+
+profileTrigger.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleProfileMenu();
+});
+
+profileOptions.forEach((option) => {
+  option.addEventListener("click", () => {
+    setProfile(option.dataset.profile ?? "General");
+    closeProfileMenu();
+  });
+});
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.closest("#profileTrigger") || target.closest("#profileMenu")) return;
+  closeProfileMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeProfileMenu();
+  }
 });
 
 document.querySelectorAll(".sample-btn").forEach((btn) => {
@@ -539,14 +598,6 @@ fileInput.addEventListener("change", async (event) => {
 
 selectFileBtn.addEventListener("click", (event) => {
   event.preventDefault();
-  event.stopPropagation();
-  fileInput.click();
-});
-
-uploadDropzone.addEventListener("click", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  if (target.closest("#selectFileBtn") || target.closest("#removeFileBtn")) return;
   fileInput.click();
 });
 

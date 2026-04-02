@@ -1,15 +1,17 @@
 import os
+import random
+from datetime import datetime
 from urllib.parse import urlparse
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
-    from .engine import analyze, build_redacted_preview, normalize_profile, summarize_risk, verdict
-    from .models import AuditRequest, AuditResponse
+    from .engine import analyze, build_redacted_preview, normalize_profile, safe_for_use_after_redaction, summarize_risk, verdict
+    from .models import AuditRequest, AuditResponse, AuditSummary
 except ImportError:
-    from engine import analyze, build_redacted_preview, normalize_profile, summarize_risk, verdict
-    from models import AuditRequest, AuditResponse
+    from engine import analyze, build_redacted_preview, normalize_profile, safe_for_use_after_redaction, summarize_risk, verdict
+    from models import AuditRequest, AuditResponse, AuditSummary
 
 
 def _split_csv(value: str) -> list[str]:
@@ -45,6 +47,25 @@ def _load_allowed_origins() -> list[str]:
             normalized.append(cleaned)
 
     return normalized if normalized else _default_allowed_origins()
+
+
+def _timestamp_utc() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def _run_id(now: datetime | None = None) -> str:
+    current = now or datetime.utcnow()
+    return f"GT-{current.strftime('%Y%m%d')}-{random.randint(0, 9999):04d}"
+
+
+def _overall_confidence_explanation(label: str, finding_count: int) -> str:
+    if finding_count == 0:
+        return "High confidence because no configured policy rules were triggered in this pass."
+    if label == "High":
+        return "High confidence because the strongest triggered rule matched a well-defined pattern."
+    if label == "Medium":
+        return "Medium confidence because the result includes strong indicators that still benefit from reviewer context."
+    return "Low confidence because the result depends on weaker signals and should be validated by a reviewer."
 
 
 APP_ENV = os.getenv(
@@ -91,13 +112,25 @@ def audit(req: AuditRequest) -> AuditResponse:
     status, message = verdict(findings)
     overall_severity, overall_confidence, overall_confidence_label = summarize_risk(findings)
     redacted_preview = build_redacted_preview(req.text) if status != "COMPLIANT" else None
+    timestamp = _timestamp_utc()
+    safe_for_use = safe_for_use_after_redaction(req.text, profile)
     return AuditResponse(
+        run_id=_run_id(),
+        timestamp=timestamp,
         profile=profile,
         status=status,
         message=message,
         overall_severity=overall_severity,
         overall_confidence=overall_confidence,
         overall_confidence_label=overall_confidence_label,
+        overall_confidence_explanation=_overall_confidence_explanation(overall_confidence_label, len(findings)),
+        safe_for_use=safe_for_use,
+        audit_summary=AuditSummary(
+            timestamp=timestamp,
+            profile_used=profile,
+            verdict=status,
+            finding_count=len(findings),
+        ),
         redacted_preview=redacted_preview,
         findings=findings,
     )

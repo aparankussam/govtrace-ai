@@ -60,6 +60,14 @@ REASON_LABELS = {
     "UNSUPPORTED_CLAIM": "Unsupported claim",
 }
 
+RULE_LABELS = {
+    "PII-01": "Personally identifiable information exposure",
+    "PHI-01": "Protected health information exposure",
+    "FIN-02": "Financial data disclosure",
+    "SEC-01": "Prompt injection or instruction override attempt",
+    "GEN-03": "Unsupported claim",
+}
+
 PROFILE_RULES = {
     "General": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
     "Public Sector": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
@@ -82,10 +90,10 @@ def _clip_confidence(value: float) -> float:
 
 def _confidence_label(value: float) -> str:
     if value >= 0.93:
-        return "High confidence"
+        return "High"
     if value >= 0.8:
-        return "Moderate confidence"
-    return "Low confidence"
+        return "Medium"
+    return "Low"
 
 
 def _severity_rank(value: str) -> int:
@@ -106,6 +114,22 @@ def _snippet(text: str, start: int, end: int, padding: int = 18) -> str:
     return text[left:right].strip()
 
 
+def _location(text: str, start: int) -> str:
+    line = text.count("\n", 0, start) + 1
+    line_start = text.rfind("\n", 0, start)
+    column = start + 1 if line_start == -1 else start - line_start
+    return f"Line {line}, char {column}"
+
+
+def _confidence_explanation(value: float, signal: str) -> str:
+    label = _confidence_label(value)
+    if label == "High":
+        return f"High confidence because the content matched a strong {signal.lower()} signal."
+    if label == "Medium":
+        return f"Medium confidence because the content matched a likely {signal.lower()} signal that should be reviewed."
+    return f"Low confidence because the signal is weaker and needs human validation."
+
+
 def _mask_ssn(value: str) -> str:
     digits = re.sub(r"\D", "", value)
     if len(digits) < 4:
@@ -114,8 +138,7 @@ def _mask_ssn(value: str) -> str:
 
 
 def _mask_email(value: str) -> str:
-    local, _, domain = value.partition("@")
-    return f"{local[:1]}****@{domain}"
+    return "[email redacted]"
 
 
 def _mask_phone(value: str) -> str:
@@ -126,10 +149,7 @@ def _mask_phone(value: str) -> str:
 
 
 def _mask_address(value: str) -> str:
-    parts = value.split()
-    if len(parts) < 3:
-        return "[address redacted]"
-    return f"{parts[0]} {' '.join(parts[1:3])} [redacted]"
+    return "[street address redacted]"
 
 
 def _mask_credit_card(value: str) -> str:
@@ -157,8 +177,11 @@ def _make_finding(
     *,
     type: str,
     reason_code: str,
+    rule_id: str,
     severity: str,
     confidence: float,
+    signal: str,
+    location: str,
     example: str,
     rationale: str,
     recommended_action: str,
@@ -168,9 +191,14 @@ def _make_finding(
         type=type,
         reason_code=reason_code,
         reason_label=REASON_LABELS[reason_code],
+        rule_id=rule_id,
+        rule_label=RULE_LABELS[rule_id],
         severity=severity,
         confidence=confidence,
         confidence_label=_confidence_label(confidence),
+        confidence_explanation=_confidence_explanation(confidence, signal),
+        signal=signal,
+        location=location,
         example=example,
         rationale=rationale,
         recommended_action=recommended_action,
@@ -187,8 +215,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="EMAIL ADDRESS",
             reason_code="PII",
+            rule_id="PII-01",
             severity="high",
             confidence=0.96,
+            signal="Email pattern",
+            location=_location(text, match.start()),
             example=_mask_email(match.group()),
             rationale="A direct email address was detected, which is treated as sensitive contact information.",
             recommended_action="Remove or mask the email address before sending the content downstream.",
@@ -198,8 +229,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="SOCIAL SECURITY NUMBER",
             reason_code="PII",
+            rule_id="PII-01",
             severity="high",
             confidence=0.99,
+            signal="SSN pattern",
+            location=_location(text, match.start()),
             example=_mask_ssn(match.group()),
             rationale="The content matches a Social Security number pattern.",
             recommended_action="Block the payload until the SSN is fully redacted.",
@@ -209,8 +243,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="PHONE NUMBER",
             reason_code="PII",
+            rule_id="PII-01",
             severity="medium",
             confidence=0.90,
+            signal="Phone number pattern",
+            location=_location(text, match.start()),
             example=_mask_phone(match.group()),
             rationale="A phone number was detected and should be reviewed before production use.",
             recommended_action="Verify the number is necessary, or redact it before sharing.",
@@ -220,8 +257,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="STREET ADDRESS",
             reason_code="PII",
+            rule_id="PII-01",
             severity="medium",
             confidence=0.88,
+            signal="Street address pattern",
+            location=_location(text, match.start()),
             example=_snippet(text, match.start(), match.end()),
             rationale="A physical mailing or street address was detected.",
             recommended_action="Remove the address unless the workflow explicitly requires it.",
@@ -231,8 +271,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="LOCATION DETAIL",
             reason_code="PII",
+            rule_id="PII-01",
             severity="medium",
             confidence=0.82,
+            signal="City/state/ZIP pattern",
+            location=_location(text, match.start()),
             example=match.group(),
             rationale="A city, state, and ZIP combination was detected.",
             recommended_action="Review whether this location detail should remain in the prompt or payload.",
@@ -252,8 +295,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="NAME + DOB COMBINATION",
             reason_code="PII",
+            rule_id="PII-01",
             severity="high",
             confidence=0.97,
+            signal="Name and date-of-birth pattern",
+            location=_location(text, min(name_match.start(1), dob_match.start())),
             example=f"{name_match.group(1)} / {dob_match.group().strip()}",
             rationale="A named individual appears alongside a date-of-birth reference, which raises the sensitivity level of the payload.",
             recommended_action="Block or heavily redact personal identity details before proceeding.",
@@ -262,8 +308,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="DATE OF BIRTH",
             reason_code="PII",
+            rule_id="PII-01",
             severity="medium",
             confidence=0.91,
+            signal="Date-of-birth pattern",
+            location=_location(text, dob_match.start()),
             example=dob_match.group().strip(),
             rationale="A date-of-birth reference was detected and should be reviewed as personal information.",
             recommended_action="Redact or confirm that DOB data is approved for this workflow.",
@@ -273,8 +322,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="PROMPT INJECTION",
             reason_code="PROMPT_INJECTION",
+            rule_id="SEC-01",
             severity="high",
             confidence=0.99,
+            signal="Prompt injection phrase",
+            location=_location(text, match.start()),
             example=match.group(),
             rationale="The text contains language associated with attempts to override or expose model instructions.",
             recommended_action="Block the request and remove the adversarial instruction before retrying.",
@@ -284,8 +336,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="OVERCLAIM LANGUAGE",
             reason_code="UNSUPPORTED_CLAIM",
+            rule_id="GEN-03",
             severity="medium",
             confidence=0.83,
+            signal="Unsupported certainty language",
+            location=_location(text, match.start()),
             example=match.group(),
             rationale="Absolute certainty language can create policy or trust risk and should be qualified.",
             recommended_action="Route to review and replace absolute claims with evidence-backed wording.",
@@ -295,8 +350,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="CREDIT CARD NUMBER",
             reason_code="FINANCIAL",
+            rule_id="FIN-02",
             severity="high",
             confidence=0.95 + profile_rules["financial_confidence_boost"],
+            signal="Payment card pattern",
+            location=_location(text, match.start()),
             example=_mask_credit_card(match.group()),
             rationale="A payment card pattern was detected in the submitted content.",
             recommended_action="Remove the card number or replace it with a tokenized value.",
@@ -306,8 +364,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="BANK ACCOUNT DETAIL",
             reason_code="FINANCIAL",
+            rule_id="FIN-02",
             severity="high" if profile == "Finance" else "medium",
             confidence=0.89 + profile_rules["financial_confidence_boost"],
+            signal="Bank account or routing pattern",
+            location=_location(text, match.start()),
             example=match.group(),
             rationale="Banking or routing details were detected and can expose sensitive financial data.",
             recommended_action="Block or redact the account details before this content is shared.",
@@ -318,8 +379,11 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="HEALTH DATA SIGNAL",
             reason_code="HEALTH",
+            rule_id="PHI-01",
             severity=severity,
             confidence=0.84 + profile_rules["health_confidence_boost"],
+            signal="Healthcare terminology signal",
+            location=_location(text, match.start()),
             example=match.group(),
             rationale="Healthcare-oriented language suggests the content may contain patient or protected health information.",
             recommended_action="Review for PHI exposure and redact medical details before use.",
@@ -355,6 +419,15 @@ def summarize_risk(findings: list[Finding]) -> tuple[str, float, str]:
     confidence = max(f.confidence for f in findings)
     severity = _overall_severity(findings)
     return (severity, confidence, _confidence_label(confidence))
+
+
+def safe_for_use_after_redaction(text: str, profile: str = "General") -> bool:
+    redacted_preview = build_redacted_preview(text)
+    if not redacted_preview:
+        return not analyze(text, profile)
+
+    remaining_findings = analyze(redacted_preview, profile)
+    return len(remaining_findings) == 0
 
 
 def build_redacted_preview(text: str) -> Optional[str]:

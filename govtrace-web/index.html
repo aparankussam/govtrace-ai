@@ -382,6 +382,29 @@
     .menu-hidden {
       display: none;
     }
+
+    .audit-summary-card {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .safe-indicator {
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .safe-yes {
+      color: #c8f7de;
+      border-color: rgba(61, 220, 151, 0.22);
+      box-shadow: inset 0 0 0 1px rgba(61, 220, 151, 0.06);
+    }
+
+    .safe-no {
+      color: #ffd0ca;
+      border-color: rgba(255, 107, 95, 0.24);
+      box-shadow: inset 0 0 0 1px rgba(255, 107, 95, 0.06);
+    }
   </style>
 </head>
 <body class="min-h-screen font-sans text-ink-50">
@@ -589,6 +612,25 @@
                 </div>
               </div>
 
+              <div id="auditSummarySection" class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="audit-summary-card rounded-2xl p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-300">Timestamp</p>
+                  <p id="auditTimestamp" class="mt-2 text-sm font-semibold text-white"></p>
+                </div>
+                <div class="audit-summary-card rounded-2xl p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-300">Profile used</p>
+                  <p id="auditProfile" class="mt-2 text-sm font-semibold text-white"></p>
+                </div>
+                <div class="audit-summary-card rounded-2xl p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-300">Verdict</p>
+                  <p id="auditVerdict" class="mt-2 text-sm font-semibold text-white"></p>
+                </div>
+                <div class="audit-summary-card rounded-2xl p-4">
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-300">Findings</p>
+                  <p id="auditFindingCount" class="mt-2 text-sm font-semibold text-white"></p>
+                </div>
+              </div>
+
               <div class="mt-6 grid gap-4 lg:grid-cols-3">
                 <article id="findingCard1" class="finding-card rounded-[24px] border p-4">
                   <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-ink-300">Key finding</p>
@@ -612,6 +654,9 @@
                   <div>
                     <p class="text-sm font-semibold text-white">Redacted preview</p>
                     <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">Practical masking for the detected content</p>
+                  </div>
+                  <div id="safeForUseIndicator" class="safe-indicator rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em]">
+                    Safe for Use: --
                   </div>
                 </div>
                 <pre id="redactedPreview" class="mt-4 max-h-48 overflow-auto rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-6 text-ink-100"></pre>

@@ -84,8 +84,13 @@ const filePreview = document.getElementById("filePreview");
 const removeFileBtn = document.getElementById("removeFileBtn");
 const overallSeverity = document.getElementById("overallSeverity");
 const overallConfidence = document.getElementById("overallConfidence");
+const auditTimestamp = document.getElementById("auditTimestamp");
+const auditProfile = document.getElementById("auditProfile");
+const auditVerdict = document.getElementById("auditVerdict");
+const auditFindingCount = document.getElementById("auditFindingCount");
 const redactionSection = document.getElementById("redactionSection");
 const redactedPreview = document.getElementById("redactedPreview");
+const safeForUseIndicator = document.getElementById("safeForUseIndicator");
 const findingCards = Array.from(document.querySelectorAll(".finding-card"));
 
 let lastResponse = null;
@@ -189,7 +194,13 @@ function clearResultScreen() {
   operatorSupport.textContent = "";
   overallSeverity.textContent = "";
   overallConfidence.textContent = "";
+  auditTimestamp.textContent = "";
+  auditProfile.textContent = "";
+  auditVerdict.textContent = "";
+  auditFindingCount.textContent = "";
   redactedPreview.textContent = "";
+  safeForUseIndicator.textContent = "Safe for Use: --";
+  safeForUseIndicator.classList.remove("safe-yes", "safe-no");
   redactionSection.classList.add("hidden");
   detailsFindings.innerHTML = "";
   jsonPreview.textContent = "";
@@ -321,16 +332,39 @@ async function handleFileSelection(file) {
 }
 
 function summarizeFinding(finding) {
-  const type = finding.reason_label ?? finding.type ?? "Signal";
+  const type = finding.rule_id && finding.rule_label
+    ? `${finding.rule_id} — ${finding.rule_label}`
+    : finding.reason_label ?? finding.type ?? "Signal";
   const rationale = finding.rationale ?? "Potential issue detected.";
   const support = [];
   if (finding.severity) support.push(`Severity ${finding.severity}`);
-  if (finding.confidence_label) support.push(finding.confidence_label);
-  if (finding.example) support.push(`Example: ${finding.example}`);
+  if (finding.signal) support.push(`Signal: ${finding.signal}`);
+  if (finding.location) support.push(finding.location);
+  if (finding.confidence_label || finding.confidence_explanation) {
+    support.push(
+      [finding.confidence_label, finding.confidence_explanation].filter(Boolean).join(" - ")
+    );
+  }
   return {
     title: type,
     body: `${rationale}${support.length ? ` ${support.join(" • ")}.` : ""}`,
   };
+}
+
+function formatTimestamp(value) {
+  if (!value) return "Unavailable";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function renderTopFindings(data, meta) {
@@ -392,17 +426,25 @@ function renderDetails(data) {
 
   data.findings.forEach((finding) => {
     const item = document.createElement("div");
-    const confidencePct = Math.round((finding.confidence ?? 0) * 100);
+    const findingTitle = finding.rule_id && finding.rule_label
+      ? `${finding.rule_id} - ${finding.rule_label}`
+      : finding.reason_label ?? finding.type ?? "Signal";
     item.className = "rounded-2xl border border-white/10 bg-black/20 p-4";
     item.innerHTML = `
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-sm font-semibold text-white">${escapeHtml(finding.reason_label ?? finding.type ?? "Signal")}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">Reason code: ${escapeHtml(finding.reason_label ?? finding.reason_code ?? "")}</p>
-          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">${escapeHtml((finding.severity ?? "low").toUpperCase())} • ${escapeHtml(finding.confidence_label ?? "Confidence")} ${confidencePct}%</p>
+          <p class="text-sm font-semibold text-white">${escapeHtml(findingTitle)}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">Finding: ${escapeHtml(finding.type ?? "Signal")}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">${escapeHtml((finding.severity ?? "low").toUpperCase())} • ${escapeHtml(finding.confidence_label ?? "Confidence")}</p>
         </div>
       </div>
       <p class="mt-3 text-sm leading-6 text-ink-100">${escapeHtml(finding.rationale ?? "")}</p>
+      <div class="mt-3 grid gap-2 text-xs uppercase tracking-[0.2em] text-ink-300 sm:grid-cols-3">
+        <p class="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">Signal: ${escapeHtml(finding.signal ?? "N/A")}</p>
+        <p class="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">Location: ${escapeHtml(finding.location ?? "N/A")}</p>
+        <p class="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">Confidence: ${escapeHtml(finding.confidence_label ?? "N/A")}</p>
+      </div>
+      <p class="mt-3 text-sm leading-6 text-ink-100">${escapeHtml(finding.confidence_explanation ?? "")}</p>
       <p class="mt-3 break-all rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs leading-6 text-ink-100">${escapeHtml(finding.example ?? "")}</p>
       <p class="mt-3 text-sm font-medium text-white">Recommended action: <span class="font-normal text-ink-100">${escapeHtml(finding.recommended_action ?? "")}</span></p>
     `;
@@ -418,7 +460,7 @@ function renderSuccess(data) {
 
   clearResultScreen();
   lastResponse = data;
-  resultMeta.textContent = `${data.profile} profile • ${data.findings.length} finding${data.findings.length === 1 ? "" : "s"} detected`;
+  resultMeta.textContent = `${data.run_id ?? "GT-UNAVAILABLE"} • ${data.profile} profile`;
   resultCard.classList.add(meta.badgeClass);
   statusBadge.className = `inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold tracking-[0.24em] ${meta.badgeClass}`;
   statusBadge.innerHTML = `<span class="badge-dot" aria-hidden="true"></span><span>${escapeHtml(meta.badge)}</span>`;
@@ -427,9 +469,15 @@ function renderSuccess(data) {
   operatorAction.textContent = meta.action;
   operatorSupport.textContent = meta.support;
   overallSeverity.textContent = String(data.overall_severity ?? "low").toUpperCase();
-  overallConfidence.textContent = `${data.overall_confidence_label ?? "Confidence"} ${Math.round((data.overall_confidence ?? 0) * 100)}%`;
-  if (data.redacted_preview) {
-    redactedPreview.textContent = data.redacted_preview;
+  overallConfidence.textContent = [data.overall_confidence_label, data.overall_confidence_explanation].filter(Boolean).join(" - ");
+  auditTimestamp.textContent = formatTimestamp(data.audit_summary?.timestamp ?? data.timestamp);
+  auditProfile.textContent = data.audit_summary?.profile_used ?? data.profile ?? "General";
+  auditVerdict.textContent = data.audit_summary?.verdict ?? data.status ?? "UNKNOWN";
+  auditFindingCount.textContent = String(data.audit_summary?.finding_count ?? data.findings.length ?? 0);
+  if (data.status !== "COMPLIANT") {
+    redactedPreview.textContent = data.redacted_preview ?? "No automated redaction was applied for the current findings. Manual remediation is still required.";
+    safeForUseIndicator.textContent = `Safe for Use: ${data.safe_for_use ? "YES" : "NO"}`;
+    safeForUseIndicator.classList.add(data.safe_for_use ? "safe-yes" : "safe-no");
     redactionSection.classList.remove("hidden");
   }
   renderTopFindings(data, meta);
@@ -448,7 +496,11 @@ function renderError(message) {
   operatorAction.textContent = "Retry the request";
   operatorSupport.textContent = "The API did not return a valid result for this run.";
   overallSeverity.textContent = "UNKNOWN";
-  overallConfidence.textContent = "No score available";
+  overallConfidence.textContent = "No confidence explanation available";
+  auditTimestamp.textContent = "Unavailable";
+  auditProfile.textContent = profileSelect.value;
+  auditVerdict.textContent = "RUN FAILED";
+  auditFindingCount.textContent = "0";
   findingCards[0].classList.add("finding-accent-violation");
   findingCards[0].querySelector("h3").textContent = "No verdict available";
   findingCards[0].querySelector("p:last-child").textContent = "A system response was not returned, so this payload still needs review.";
@@ -467,7 +519,11 @@ function renderPending() {
   operatorAction.textContent = "Stand by";
   operatorSupport.textContent = "The result screen appears immediately so the response feels like a system action, not an inline page update.";
   overallSeverity.textContent = "SCANNING";
-  overallConfidence.textContent = "Building result";
+  overallConfidence.textContent = "Building confidence explanation";
+  auditTimestamp.textContent = "Pending";
+  auditProfile.textContent = profileSelect.value;
+  auditVerdict.textContent = "RUNNING CHECK";
+  auditFindingCount.textContent = "--";
   findingCards[0].classList.add("finding-accent-review");
   findingCards[0].querySelector("h3").textContent = "Scanning policy signals";
   findingCards[0].querySelector("p:last-child").textContent = "Looking for identity data, contact information, location details, adversarial prompts, and unsupported certainty language.";

@@ -351,6 +351,30 @@ function summarizeFinding(finding) {
   };
 }
 
+function groupFindingsByRule(findings) {
+  const groups = new Map();
+
+  findings.forEach((finding) => {
+    const key = finding.rule_id ?? finding.type ?? "UNKNOWN";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        ruleId: finding.rule_id ?? "",
+        ruleLabel: finding.rule_label ?? finding.reason_label ?? "Signal",
+        findings: [],
+      });
+    }
+
+    groups.get(key).findings.push(finding);
+  });
+
+  return Array.from(groups.values()).sort((left, right) => {
+    const leftTop = left.findings[0];
+    const rightTop = right.findings[0];
+
+    return (rightTop?.confidence ?? 0) - (leftTop?.confidence ?? 0);
+  });
+}
+
 function formatTimestamp(value) {
   if (!value) return "Unavailable";
 
@@ -368,7 +392,18 @@ function formatTimestamp(value) {
 }
 
 function renderTopFindings(data, meta) {
-  const items = data.findings.slice(0, 3);
+  const items = groupFindingsByRule(data.findings)
+    .slice(0, 3)
+    .map((group) => {
+      const topFinding = group.findings[0];
+      const summary = summarizeFinding(topFinding);
+      return {
+        title: `${group.ruleId} — ${group.ruleLabel}`,
+        body: group.findings.length > 1
+          ? `${summary.body} ${group.findings.length} findings mapped to this policy category.`
+          : summary.body,
+      };
+    });
 
   if (items.length === 0) {
     const emptyCopy = [
@@ -402,10 +437,9 @@ function renderTopFindings(data, meta) {
       return;
     }
 
-    const summary = summarizeFinding(item);
     card.classList.add(meta.findingClass);
-    card.querySelector("h3").textContent = summary.title;
-    card.querySelector("p:last-child").textContent = summary.body;
+    card.querySelector("h3").textContent = item.title;
+    card.querySelector("p:last-child").textContent = item.body;
   });
 }
 
@@ -424,12 +458,24 @@ function renderDetails(data) {
     return;
   }
 
-  data.findings.forEach((finding) => {
+  groupFindingsByRule(data.findings).forEach((group) => {
+    const section = document.createElement("div");
+    section.className = "rounded-2xl border border-white/10 bg-black/20 p-4";
+    section.innerHTML = `
+      <div class="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-3">
+        <div>
+          <p class="text-sm font-semibold text-white">${escapeHtml(`${group.ruleId} - ${group.ruleLabel}`)}</p>
+          <p class="mt-1 text-xs uppercase tracking-[0.22em] text-ink-300">${group.findings.length} finding${group.findings.length === 1 ? "" : "s"} in this policy category</p>
+        </div>
+      </div>
+    `;
+
+    group.findings.forEach((finding) => {
     const item = document.createElement("div");
     const findingTitle = finding.rule_id && finding.rule_label
       ? `${finding.rule_id} - ${finding.rule_label}`
       : finding.reason_label ?? finding.type ?? "Signal";
-    item.className = "rounded-2xl border border-white/10 bg-black/20 p-4";
+    item.className = "mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4";
     item.innerHTML = `
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -448,7 +494,10 @@ function renderDetails(data) {
       <p class="mt-3 break-all rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs leading-6 text-ink-100">${escapeHtml(finding.example ?? "")}</p>
       <p class="mt-3 text-sm font-medium text-white">Recommended action: <span class="font-normal text-ink-100">${escapeHtml(finding.recommended_action ?? "")}</span></p>
     `;
-    detailsFindings.appendChild(item);
+      section.appendChild(item);
+    });
+
+    detailsFindings.appendChild(section);
   });
 
   detailsSection.classList.remove("hidden");

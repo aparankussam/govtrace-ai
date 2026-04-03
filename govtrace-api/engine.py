@@ -35,6 +35,11 @@ _OVERCLAIM = re.compile(
     r"\b(?:guaranteed|proven fact|always|never|no doubt|unquestionably|certainly compliant|risk free)\b",
     re.IGNORECASE,
 )
+_EXTERNAL_SHARING = re.compile(
+    r"\b(?:share(?:d)? with external partners|send to vendors?|distribute broadly|share with all staff|"
+    r"training purposes outside controlled use|external sharing|share externally)\b",
+    re.IGNORECASE,
+)
 _CREDIT_CARD = re.compile(r"\b(?:\d[ -]*?){13,16}\b")
 _BANK_ACCOUNT = re.compile(r"\b(?:account number|acct(?:ount)?|routing)\s*[:#-]?\s*\d{6,17}\b", re.IGNORECASE)
 _HEALTH_DATA = re.compile(
@@ -56,16 +61,20 @@ REASON_LABELS = {
     "PII": "PII detected",
     "FINANCIAL": "Financial data detected",
     "HEALTH": "Health data detected",
+    "EXTERNAL_SHARING": "Unsafe external sharing",
     "PROMPT_INJECTION": "Prompt injection attempt",
     "UNSUPPORTED_CLAIM": "Unsupported claim",
 }
 
 RULE_LABELS = {
-    "PII-01": "Personally identifiable information exposure",
     "PHI-01": "Protected health information exposure",
-    "FIN-02": "Financial data disclosure",
+    "PII-01": "Personally identifiable information exposure",
+    "PII-02": "Contact information detected",
+    "PII-03": "Identity record exposure",
+    "FIN-02": "Financial account disclosure",
     "SEC-01": "Prompt injection or instruction override attempt",
-    "GEN-03": "Unsupported claim",
+    "GEN-03": "Unsafe external sharing",
+    "GEN-04": "Unsupported claim",
 }
 
 PROFILE_RULES = {
@@ -173,6 +182,13 @@ def _dedupe(findings: Iterable[Finding]) -> list[Finding]:
     return sorted(unique, key=lambda finding: (-_severity_rank(finding.severity), -finding.confidence, finding.type))
 
 
+def _has_clinical_context(text: str, start: int, end: int) -> bool:
+    window_start = max(0, start - 80)
+    window_end = min(len(text), end + 80)
+    window = text[window_start:window_end]
+    return bool(re.search(r"\b(?:patient|diagnosis|diagnosed|treatment|medication|prescription|mrn|medical record|phi|hipaa)\b", window, re.IGNORECASE))
+
+
 def _make_finding(
     *,
     type: str,
@@ -215,8 +231,8 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="EMAIL ADDRESS",
             reason_code="PII",
-            rule_id="PII-01",
-            severity="high",
+            rule_id="PII-02",
+            severity="medium",
             confidence=0.96,
             signal="Email pattern",
             location=_location(text, match.start()),
@@ -229,7 +245,7 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="SOCIAL SECURITY NUMBER",
             reason_code="PII",
-            rule_id="PII-01",
+            rule_id="PII-03",
             severity="high",
             confidence=0.99,
             signal="SSN pattern",
@@ -243,7 +259,7 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="PHONE NUMBER",
             reason_code="PII",
-            rule_id="PII-01",
+            rule_id="PII-02",
             severity="medium",
             confidence=0.90,
             signal="Phone number pattern",
@@ -292,23 +308,24 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
             name_match = person_match
 
     if dob_match and name_match:
+        rule_id = "PHI-01" if _has_clinical_context(text, name_match.start(1), dob_match.end()) else "PII-03"
         findings.append(_make_finding(
             type="NAME + DOB COMBINATION",
-            reason_code="PII",
-            rule_id="PII-01",
+            reason_code="HEALTH" if rule_id == "PHI-01" else "PII",
+            rule_id=rule_id,
             severity="high",
-            confidence=0.97,
-            signal="Name and date-of-birth pattern",
+            confidence=0.98 if rule_id == "PHI-01" else 0.97,
+            signal="Patient identity and date-of-birth pattern" if rule_id == "PHI-01" else "Name and date-of-birth pattern",
             location=_location(text, min(name_match.start(1), dob_match.start())),
             example=f"{name_match.group(1)} / {dob_match.group().strip()}",
-            rationale="A named individual appears alongside a date-of-birth reference, which raises the sensitivity level of the payload.",
-            recommended_action="Block or heavily redact personal identity details before proceeding.",
+            rationale="A named individual appears alongside a date-of-birth reference, which creates a direct identifying record." if rule_id == "PII-03" else "A patient identity marker appears alongside a date-of-birth reference in clinical context, which raises PHI exposure risk.",
+            recommended_action="Block or heavily redact personal identity details before proceeding." if rule_id == "PII-03" else "Block the payload and remove patient-linked clinical identity details before proceeding.",
         ))
     elif dob_match:
         findings.append(_make_finding(
             type="DATE OF BIRTH",
             reason_code="PII",
-            rule_id="PII-01",
+            rule_id="PII-03",
             severity="medium",
             confidence=0.91,
             signal="Date-of-birth pattern",
@@ -336,7 +353,7 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
         findings.append(_make_finding(
             type="OVERCLAIM LANGUAGE",
             reason_code="UNSUPPORTED_CLAIM",
-            rule_id="GEN-03",
+            rule_id="GEN-04",
             severity="medium",
             confidence=0.83,
             signal="Unsupported certainty language",
@@ -344,6 +361,20 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
             example=match.group(),
             rationale="Absolute certainty language can create policy or trust risk and should be qualified.",
             recommended_action="Route to review and replace absolute claims with evidence-backed wording.",
+        ))
+
+    for match in _EXTERNAL_SHARING.finditer(text):
+        findings.append(_make_finding(
+            type="EXTERNAL SHARING INSTRUCTION",
+            reason_code="EXTERNAL_SHARING",
+            rule_id="GEN-03",
+            severity="high" if any(f.reason_code in {"PII", "HEALTH", "FINANCIAL"} for f in findings) else "medium",
+            confidence=0.86,
+            signal="External sharing phrase",
+            location=_location(text, match.start()),
+            example=match.group(),
+            rationale="The content includes language suggesting broad or external sharing, which raises governance risk when sensitive material is present.",
+            recommended_action="Restrict distribution to approved internal channels and remove external sharing instructions before use.",
         ))
 
     for match in _CREDIT_CARD.finditer(text):

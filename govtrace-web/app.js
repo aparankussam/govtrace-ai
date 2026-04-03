@@ -9,6 +9,11 @@ const SITE_URL = normalizeSiteUrl(runtimeConfig.siteUrl);
 const REQUEST_TIMEOUT_MS = 12000;
 const MAX_INPUT_CHARS = 10000;
 const FILE_PREVIEW_CHARS = 1400;
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_PDF_PAGES = 40;
+const PDF_JS_LOAD_TIMEOUT_MS = 8000;
+const PDF_JS_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDF_JS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 const SAMPLES = {
   safe: "Release note draft: The support chatbot now answers account questions using approved knowledge base content only. No customer records, personal identifiers, or unsupported claims are included.",
@@ -81,6 +86,7 @@ const fileName = document.getElementById("fileName");
 const fileMeta = document.getElementById("fileMeta");
 const fileStatusMsg = document.getElementById("fileStatusMsg");
 const filePreview = document.getElementById("filePreview");
+const fileErrorMsg = document.getElementById("fileErrorMsg");
 const removeFileBtn = document.getElementById("removeFileBtn");
 const overallSeverity = document.getElementById("overallSeverity");
 const overallConfidence = document.getElementById("overallConfidence");
@@ -95,6 +101,7 @@ const findingCards = Array.from(document.querySelectorAll(".finding-card"));
 
 let lastResponse = null;
 let loading = false;
+let uploadProcessing = false;
 let activeMode = "text";
 let uploadedPayload = {
   file: null,
@@ -103,6 +110,7 @@ let uploadedPayload = {
   preview: "",
   canAnalyze: false,
 };
+let pdfJsLibPromise = null;
 
 function setProfile(profile) {
   profileSelect.value = profile;
@@ -169,9 +177,13 @@ function truncateText(value, limit = MAX_INPUT_CHARS) {
   return String(value ?? "").slice(0, limit);
 }
 
+function logUploadDebug(event, details = {}) {
+  console.info(`[GovTrace upload] ${event}`, details);
+}
+
 function setLoading(on) {
   loading = on;
-  checkBtn.disabled = on || !getActivePayload().trim();
+  checkBtn.disabled = on || uploadProcessing || !getActivePayload().trim();
   backBtn.disabled = on;
   btnLabel.textContent = on ? "Running Policy Check..." : "Run Policy Check";
   spinner.classList.toggle("hidden", !on);
@@ -225,7 +237,28 @@ function getActivePayload() {
 }
 
 function syncActionState() {
-  checkBtn.disabled = loading || !getActivePayload();
+  checkBtn.disabled = loading || uploadProcessing || !getActivePayload();
+}
+
+function clearUploadError() {
+  fileErrorMsg.textContent = "";
+  fileErrorMsg.classList.add("hidden");
+}
+
+function showUploadError(message) {
+  fileErrorMsg.textContent = message;
+  fileErrorMsg.classList.remove("hidden");
+}
+
+function setUploadProcessing(on) {
+  uploadProcessing = on;
+  selectFileBtn.disabled = on;
+  selectFileBtn.classList.toggle("opacity-70", on);
+  selectFileBtn.classList.toggle("cursor-not-allowed", on);
+  removeFileBtn.disabled = on;
+  removeFileBtn.classList.toggle("opacity-70", on);
+  removeFileBtn.classList.toggle("cursor-not-allowed", on);
+  syncActionState();
 }
 
 function updateCharCount() {
@@ -262,6 +295,7 @@ function resetUploadedPayload() {
   fileMeta.textContent = "";
   fileStatusMsg.textContent = "";
   filePreview.textContent = "";
+  clearUploadError();
   uploadDropzone.classList.remove("upload-active");
   uploadDropzone.classList.add("upload-idle");
 
@@ -291,44 +325,296 @@ function renderUploadedPayload() {
   fileName.textContent = uploadedPayload.file.name;
   fileMeta.textContent = `${uploadedPayload.file.type || "file"} • ${Math.max(1, Math.ceil(uploadedPayload.file.size / 1024))} KB`;
   fileStatusMsg.textContent = uploadedPayload.status;
-  filePreview.textContent = uploadedPayload.preview || "Preview unavailable for this file type yet.";
+  filePreview.textContent = uploadedPayload.preview || "No preview available yet.";
 
   syncActionState();
 }
 
-async function handleFileSelection(file) {
-  if (!file) return;
+function updateUploadedPayload(partial) {
+  uploadedPayload = {
+    ...uploadedPayload,
+    ...partial,
+  };
+  renderUploadedPayload();
+}
 
-  const extension = file.name.toLowerCase().split(".").pop();
+function getFileExtension(file) {
+  return file.name.toLowerCase().split(".").pop() ?? "";
+}
+
+function validateSelectedFile(file) {
+  const extension = getFileExtension(file);
   const isTextFile = extension === "txt" || file.type === "text/plain";
   const isPdfFile = extension === "pdf" || file.type === "application/pdf";
 
   if (!isTextFile && !isPdfFile) {
-    throw new Error("Unsupported file type. Please upload a .txt file or a staged .pdf file.");
+    throw new Error("Unsupported file type. Please upload a .txt or .pdf file.");
   }
 
-  if (isPdfFile) {
-    uploadedPayload = {
-      file,
-      text: "",
-      status: "PDF analysis is coming soon. This upload is staged in the demo, but extraction is not connected yet.",
-      preview: "PDF extraction is not yet connected in this frontend build.",
-      canAnalyze: false,
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(`File is too large. Please upload a file smaller than ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB.`);
+  }
+
+  return { isTextFile, isPdfFile };
+}
+
+function finalizeExtractedText(text) {
+  const normalized = normalizeExtractedText(text);
+  const truncatedText = truncateText(normalized);
+  return {
+    text: truncatedText,
+    hasText: truncatedText.trim().length > 0,
+    truncated: normalized.length > MAX_INPUT_CHARS,
+  };
+}
+
+function normalizeExtractedText(value) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function isPdfPasswordError(error) {
+  return error?.name === "PasswordException" || /password/i.test(String(error?.message ?? ""));
+}
+
+function isPdfInvalidError(error) {
+  return error?.name === "InvalidPDFException"
+    || error?.name === "MissingPDFException"
+    || /invalid pdf|missing pdf|corrupt|malformed/i.test(String(error?.message ?? ""));
+}
+
+function loadPdfJs() {
+  if (window.pdfjsLib?.getDocument) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_JS_WORKER_URL;
+    return Promise.resolve(window.pdfjsLib);
+  }
+
+  if (pdfJsLibPromise) {
+    return pdfJsLibPromise;
+  }
+
+  pdfJsLibPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-pdfjs="true"]');
+    let timeoutId;
+    const fail = (message) => {
+      window.clearTimeout(timeoutId);
+      pdfJsLibPromise = null;
+      reject(new Error(message));
     };
-    renderUploadedPayload();
-    return;
+    const handleReady = () => {
+      window.clearTimeout(timeoutId);
+      if (!window.pdfjsLib?.getDocument) {
+        pdfJsLibPromise = null;
+        reject(new Error("PDF support could not be initialized in this browser."));
+        return;
+      }
+
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_JS_WORKER_URL;
+      resolve(window.pdfjsLib);
+    };
+
+    if (existing) {
+      existing.addEventListener("load", handleReady, { once: true });
+      existing.addEventListener("error", () => {
+        fail("PDF support could not be loaded right now.");
+      }, { once: true });
+      timeoutId = window.setTimeout(() => {
+        fail("PDF support took too long to load. Please try again.");
+      }, PDF_JS_LOAD_TIMEOUT_MS);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = PDF_JS_SCRIPT_URL;
+    script.async = true;
+    script.dataset.pdfjs = "true";
+    script.addEventListener("load", handleReady, { once: true });
+    script.addEventListener("error", () => {
+      fail("PDF support could not be loaded right now.");
+    }, { once: true });
+    timeoutId = window.setTimeout(() => {
+      fail("PDF support took too long to load. Please try again.");
+    }, PDF_JS_LOAD_TIMEOUT_MS);
+    document.head.appendChild(script);
+  });
+
+  return pdfJsLibPromise;
+}
+
+async function extractPdfText(file, onStatus) {
+  logUploadDebug("pdf_extraction_started", {
+    name: file.name,
+    type: file.type || "application/pdf",
+    size: file.size,
+  });
+  onStatus("Loading PDF parser...");
+  const pdfjsLib = await loadPdfJs();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  let loadingTask;
+  let pdfDocument;
+
+  try {
+    loadingTask = pdfjsLib.getDocument({ data: bytes });
+    pdfDocument = await loadingTask.promise;
+  } catch (error) {
+    logUploadDebug("pdf_open_failed", {
+      name: file.name,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    if (isPdfPasswordError(error)) {
+      throw new Error("This PDF is password-protected. Please upload an unlocked PDF.");
+    }
+
+    if (isPdfInvalidError(error)) {
+      throw new Error("This PDF is invalid or corrupted. Please upload a different file.");
+    }
+
+    throw new Error("This PDF could not be read. Please try a different PDF.");
   }
 
-  const extractedText = truncateText(await file.text());
+  try {
+    if (pdfDocument.numPages > MAX_PDF_PAGES) {
+      throw new Error(`This PDF has ${pdfDocument.numPages} pages. Please upload a PDF with ${MAX_PDF_PAGES} pages or fewer.`);
+    }
+
+    const pageText = [];
+
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      onStatus(`Extracting text from PDF page ${pageNumber} of ${pdfDocument.numPages}...`);
+      const page = await pdfDocument.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const extracted = textContent.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ");
+      const normalized = normalizeExtractedText(extracted);
+
+      if (normalized) {
+        pageText.push(normalized);
+      }
+    }
+
+    const combinedText = normalizeExtractedText(pageText.join("\n\n"));
+    if (!combinedText) {
+      logUploadDebug("pdf_extraction_failed", {
+        name: file.name,
+        reason: "no_extractable_text",
+      });
+      throw new Error("This PDF does not contain extractable text. If it is a scanned document, run OCR first and try again.");
+    }
+
+    const finalized = finalizeExtractedText(combinedText);
+    logUploadDebug("pdf_extraction_succeeded", {
+      name: file.name,
+      pageCount: pdfDocument.numPages,
+      extractedChars: combinedText.length,
+      analyzedChars: finalized.text.length,
+      truncated: finalized.truncated,
+    });
+
+    return {
+      text: finalized.text,
+      pageCount: pdfDocument.numPages,
+      truncated: finalized.truncated,
+    };
+  } finally {
+    pdfDocument?.cleanup();
+    await loadingTask?.destroy();
+  }
+}
+
+async function extractFileText(file, fileKind, onStatus) {
+  if (fileKind === "txt") {
+    const finalized = finalizeExtractedText(await file.text());
+    return {
+      ...finalized,
+      mode: "txt",
+    };
+  }
+
+  const result = await extractPdfText(file, onStatus);
+  return {
+    ...result,
+    mode: "pdf",
+  };
+}
+
+async function handleFileSelection(file) {
+  if (!file) return;
+  clearUploadError();
+
+  const { isTextFile, isPdfFile } = validateSelectedFile(file);
+  const fileKind = isPdfFile ? "pdf" : "txt";
+  logUploadDebug("file_selected", {
+    name: file.name,
+    type: file.type || "unknown",
+    size: file.size,
+    mode: fileKind,
+  });
+  setUploadProcessing(true);
+
   uploadedPayload = {
     file,
-    text: extractedText,
-    status: "Text extracted successfully. This file is ready for the same policy check flow as pasted content.",
-    preview: extractedText.slice(0, FILE_PREVIEW_CHARS),
-    canAnalyze: extractedText.trim().length > 0,
+    text: "",
+    status: isPdfFile ? "Preparing PDF for text extraction..." : "Reading text file...",
+    preview: "",
+    canAnalyze: false,
   };
-
   renderUploadedPayload();
+
+  try {
+    if (isTextFile) {
+      const result = await extractFileText(file, "txt");
+      updateUploadedPayload({
+        text: result.text,
+        status: result.hasText
+          ? result.truncated
+            ? `Text extracted successfully. Analysis will use the first ${MAX_INPUT_CHARS.toLocaleString()} characters.`
+            : "Text extracted successfully. This file is ready for the same policy check flow as pasted content."
+          : "This text file is empty. Add content to continue.",
+        preview: result.text.slice(0, FILE_PREVIEW_CHARS),
+        canAnalyze: result.hasText,
+      });
+      logUploadDebug("file_ready", {
+        name: file.name,
+        mode: "txt",
+        analyzedChars: result.text.length,
+        truncated: result.truncated,
+      });
+      return;
+    }
+
+    const result = await extractFileText(file, "pdf", (status) => {
+      updateUploadedPayload({ status });
+    });
+
+    updateUploadedPayload({
+      text: result.text,
+      status: result.truncated
+        ? `Text extracted from ${result.pageCount} PDF page${result.pageCount === 1 ? "" : "s"}. Analysis will use the first ${MAX_INPUT_CHARS.toLocaleString()} characters.`
+        : `Text extracted from ${result.pageCount} PDF page${result.pageCount === 1 ? "" : "s"}. This file is ready for analysis.`,
+      preview: result.text.slice(0, FILE_PREVIEW_CHARS),
+      canAnalyze: true,
+    });
+  } catch (error) {
+    logUploadDebug("file_processing_failed", {
+      name: file.name,
+      mode: fileKind,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+    updateUploadedPayload({
+      text: "",
+      status: error instanceof Error ? error.message : "The selected file could not be processed.",
+      preview: "",
+      canAnalyze: false,
+    });
+    throw error;
+  } finally {
+    setUploadProcessing(false);
+  }
 }
 
 function summarizeFinding(finding) {
@@ -697,7 +983,10 @@ fileInput.addEventListener("change", async (event) => {
   try {
     await handleFileSelection(file);
   } catch (error) {
-    renderError(error instanceof Error ? error.message : "The selected file could not be processed. Please try a different file.");
+    if (!uploadedPayload.file) {
+      resetUploadedPayload();
+    }
+    showUploadError(error instanceof Error ? error.message : "The selected file could not be processed. Please try a different file.");
   }
 });
 
@@ -731,7 +1020,10 @@ uploadDropzone.addEventListener("drop", async (event) => {
   try {
     await handleFileSelection(file);
   } catch (error) {
-    renderError(error instanceof Error ? error.message : "The dropped file could not be processed. Please try a different file.");
+    if (!uploadedPayload.file) {
+      resetUploadedPayload();
+    }
+    showUploadError(error instanceof Error ? error.message : "The dropped file could not be processed. Please try a different file.");
   }
 });
 

@@ -500,7 +500,7 @@
                     <div>
                       <p class="text-lg font-semibold text-white">Upload file</p>
                       <p class="mt-1 text-sm leading-6 text-ink-100">
-                        Text files are processed instantly. PDF support coming soon.
+                        Text files and text-based PDFs are processed through the same policy check flow.
                       </p>
                     </div>
                     <button id="selectFileBtn" type="button" class="inline-flex items-center justify-center rounded-full bg-ember-500 px-4 py-2.5 text-sm font-semibold text-white shadow-ember transition hover:bg-ember-400">
@@ -536,6 +536,12 @@
                         <pre id="filePreview" class="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-ink-100"></pre>
                       </div>
                     </div>
+
+                    <p
+                      id="fileErrorMsg"
+                      class="mt-4 hidden rounded-2xl border border-[#ff6b5f]/35 bg-[#ff6b5f]/10 px-4 py-3 text-sm leading-6 text-[#ffb7b0]"
+                      aria-live="polite"
+                    ></p>
                   </div>
                 </div>
               </div>

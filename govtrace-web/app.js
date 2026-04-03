@@ -12,8 +12,8 @@ const FILE_PREVIEW_CHARS = 1400;
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const MAX_PDF_PAGES = 40;
 const PDF_JS_LOAD_TIMEOUT_MS = 8000;
-const PDF_JS_SCRIPT_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-const PDF_JS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const PDF_JS_SCRIPT_URL = "/vendor/pdfjs/pdf.min.js";
+const PDF_JS_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.js";
 
 const SAMPLES = {
   safe: "Release note draft: The support chatbot now answers account questions using approved knowledge base content only. No customer records, personal identifiers, or unsupported claims are included.",

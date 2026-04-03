@@ -35,6 +35,12 @@ _OVERCLAIM = re.compile(
     r"\b(?:guaranteed|proven fact|always|never|no doubt|unquestionably|certainly compliant|risk free)\b",
     re.IGNORECASE,
 )
+_UNVERIFIED = re.compile(
+    r"\b(?:tbd|to be confirmed|not yet verified|unverified|awaiting confirmation|"
+    r"pending documentation|documentation unavailable|evidence pending|source not confirmed|"
+    r"preliminary only|based on limited data)\b",
+    re.IGNORECASE,
+)
 _EXTERNAL_SHARING = re.compile(
     r"\b(?:share(?:d)? with external partners|send to vendors?|distribute broadly|share with all staff|"
     r"training purposes outside controlled use|external sharing|share externally)\b",
@@ -64,6 +70,7 @@ REASON_LABELS = {
     "EXTERNAL_SHARING": "Unsafe external sharing",
     "PROMPT_INJECTION": "Prompt injection attempt",
     "UNSUPPORTED_CLAIM": "Unsupported claim",
+    "INCOMPLETE_EVIDENCE": "Incomplete or unverified information",
 }
 
 RULE_LABELS = {
@@ -75,6 +82,7 @@ RULE_LABELS = {
     "SEC-01": "Prompt injection or instruction override attempt",
     "GEN-03": "Unsafe external sharing",
     "GEN-04": "Unsupported claim",
+    "GEN-05": "Incomplete or unverified support",
 }
 
 PROFILE_RULES = {
@@ -361,6 +369,20 @@ def analyze(text: str, profile: str = "General") -> list[Finding]:
             example=match.group(),
             rationale="Absolute certainty language can create policy or trust risk and should be qualified.",
             recommended_action="Route to review and replace absolute claims with evidence-backed wording.",
+        ))
+
+    for match in _UNVERIFIED.finditer(text):
+        findings.append(_make_finding(
+            type="UNVERIFIED OR INCOMPLETE CLAIM",
+            reason_code="INCOMPLETE_EVIDENCE",
+            rule_id="GEN-05",
+            severity="medium",
+            confidence=0.81,
+            signal="Incomplete evidence phrase",
+            location=_location(text, match.start()),
+            example=match.group(),
+            rationale="The content explicitly signals missing verification, documentation, or incomplete evidence and should not be treated as fully cleared.",
+            recommended_action="Route to review and confirm the missing support before using this content in a live workflow.",
         ))
 
     for match in _EXTERNAL_SHARING.finditer(text):

@@ -29,7 +29,10 @@ def _normalize_origin(origin: str) -> str | None:
 
 def _default_allowed_origins() -> list[str]:
     if os.getenv("VERCEL_ENV"):
-        return []
+        return [
+            "https://govtrace.gobotsai.com",
+            "https://govtrace-ai.vercel.app",
+        ]
 
     return [
         "http://localhost:3000",
@@ -45,6 +48,10 @@ def _load_allowed_origins() -> list[str]:
         cleaned = _normalize_origin(origin)
         if cleaned and cleaned not in normalized:
             normalized.append(cleaned)
+
+    site_url_origin = _normalize_origin(os.getenv("GOVTRACE_SITE_URL", "").strip())
+    if site_url_origin and site_url_origin not in normalized:
+        normalized.append(site_url_origin)
 
     return normalized if normalized else _default_allowed_origins()
 

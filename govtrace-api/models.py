@@ -8,6 +8,12 @@ class AuditRequest(BaseModel):
     profile: str = Field(default="General", max_length=50)
 
 
+class RegulatoryReference(BaseModel):
+    citation: str
+    body: str
+    url: str
+
+
 class Finding(BaseModel):
     type: str
     reason_code: str
@@ -23,6 +29,7 @@ class Finding(BaseModel):
     example: str
     rationale: str
     recommended_action: str
+    regulatory_references: list[RegulatoryReference] = Field(default_factory=list)
 
 
 class AuditSummary(BaseModel):

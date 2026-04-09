@@ -2,9 +2,9 @@ import re
 from typing import Iterable, Optional
 
 try:
-    from .models import Finding
+    from .models import Finding, RegulatoryReference
 except ImportError:
-    from models import Finding
+    from models import Finding, RegulatoryReference
 
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
@@ -83,6 +83,141 @@ RULE_LABELS = {
     "GEN-03": "Unsafe external sharing",
     "GEN-04": "Unsupported claim",
     "GEN-05": "Incomplete or unverified support",
+}
+
+# Regulatory citation registry — keyed by rule_id.
+# Each entry maps to one or more real regulatory frameworks.
+# This is the foundation for the configurable rule engine (rules are
+# currently hardcoded but this registry is the extraction point).
+REGULATORY_CITATIONS: dict[str, list[dict[str, str]]] = {
+    "PII-01": [
+        {
+            "citation": "GDPR Art. 4(1) — Definition of personal data",
+            "body": "EU GDPR",
+            "url": "https://gdpr-info.eu/art-4-gdpr/",
+        },
+        {
+            "citation": "CCPA §1798.140(o) — Definition of personal information",
+            "body": "California CCPA",
+            "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.140",
+        },
+    ],
+    "PII-02": [
+        {
+            "citation": "GDPR Art. 4(1) — Definition of personal data",
+            "body": "EU GDPR",
+            "url": "https://gdpr-info.eu/art-4-gdpr/",
+        },
+        {
+            "citation": "CCPA §1798.140(o) — Definition of personal information",
+            "body": "California CCPA",
+            "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.140",
+        },
+    ],
+    "PII-03": [
+        {
+            "citation": "GDPR Art. 9 — Processing of special categories of personal data",
+            "body": "EU GDPR",
+            "url": "https://gdpr-info.eu/art-9-gdpr/",
+        },
+        {
+            "citation": "CCPA §1798.140(o) — Definition of personal information",
+            "body": "California CCPA",
+            "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.140",
+        },
+        {
+            "citation": "Privacy Act of 1974, 5 U.S.C. §552a — Records maintained on individuals",
+            "body": "US Federal",
+            "url": "https://www.govinfo.gov/content/pkg/USCODE-2010-title5/pdf/USCODE-2010-title5-partI-chap5-subchapII-sec552a.pdf",
+        },
+    ],
+    "PHI-01": [
+        {
+            "citation": "HIPAA §164.514 — De-identification of protected health information",
+            "body": "HHS / HIPAA Privacy Rule",
+            "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.514",
+        },
+        {
+            "citation": "HIPAA §164.502 — Uses and disclosures of protected health information",
+            "body": "HHS / HIPAA Privacy Rule",
+            "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-E/section-164.502",
+        },
+        {
+            "citation": "HITECH Act §13402 — Notification in the case of breach",
+            "body": "HHS / HITECH",
+            "url": "https://www.hhs.gov/hipaa/for-professionals/breach-notification/index.html",
+        },
+    ],
+    "FIN-02": [
+        {
+            "citation": "PCI DSS v4.0 Requirement 3 — Protect stored account data",
+            "body": "PCI Security Standards Council",
+            "url": "https://www.pcisecuritystandards.org/document_library/",
+        },
+        {
+            "citation": "GLBA §6802 — Obligations regarding disclosure of personal information",
+            "body": "US Federal / Gramm-Leach-Bliley Act",
+            "url": "https://www.govinfo.gov/content/pkg/USCODE-2018-title15/pdf/USCODE-2018-title15-chap94-subchapI-sec6802.pdf",
+        },
+        {
+            "citation": "CCPA §1798.140(o) — Definition of personal information",
+            "body": "California CCPA",
+            "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1798.140",
+        },
+    ],
+    "SEC-01": [
+        {
+            "citation": "NIST AI RMF — GOVERN 1.1 (AI risk policies and procedures)",
+            "body": "NIST AI Risk Management Framework",
+            "url": "https://airc.nist.gov/Docs/1",
+        },
+        {
+            "citation": "OWASP LLM Top 10 — LLM01: Prompt Injection",
+            "body": "OWASP",
+            "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+        },
+        {
+            "citation": "EU AI Act Art. 9 — Risk management system",
+            "body": "EU AI Act",
+            "url": "https://artificialintelligenceact.eu/article/9/",
+        },
+    ],
+    "GEN-03": [
+        {
+            "citation": "GDPR Art. 28 — Processor obligations and sub-processor controls",
+            "body": "EU GDPR",
+            "url": "https://gdpr-info.eu/art-28-gdpr/",
+        },
+        {
+            "citation": "HIPAA §164.314 — Business associate contracts and other arrangements",
+            "body": "HHS / HIPAA Security Rule",
+            "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.314",
+        },
+    ],
+    "GEN-04": [
+        {
+            "citation": "FTC Act §5 — Unfair or deceptive acts or practices",
+            "body": "US Federal Trade Commission",
+            "url": "https://www.ftc.gov/legal-library/browse/statutes/federal-trade-commission-act",
+        },
+        {
+            "citation": "EU AI Act Art. 13 — Transparency and provision of information to deployers",
+            "body": "EU AI Act",
+            "url": "https://artificialintelligenceact.eu/article/13/",
+        },
+    ],
+    "GEN-05": [
+        {
+            "citation": "EU AI Act Art. 9 — Risk management system",
+            "body": "EU AI Act",
+            "url": "https://artificialintelligenceact.eu/article/9/",
+        },
+        {
+            "citation": "ISO/IEC 42001:2023 §6.1 — Actions to address risks and opportunities",
+            "body": "ISO/IEC",
+            "url": "https://www.iso.org/standard/81230.html",
+        },
+    ],
 }
 
 PROFILE_RULES = {
@@ -211,6 +346,10 @@ def _make_finding(
     recommended_action: str,
 ) -> Finding:
     confidence = _clip_confidence(confidence)
+    regulatory_references = [
+        RegulatoryReference(**ref)
+        for ref in REGULATORY_CITATIONS.get(rule_id, [])
+    ]
     return Finding(
         type=type,
         reason_code=reason_code,
@@ -226,6 +365,7 @@ def _make_finding(
         example=example,
         rationale=rationale,
         recommended_action=recommended_action,
+        regulatory_references=regulatory_references,
     )
 
 

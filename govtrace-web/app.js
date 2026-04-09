@@ -211,7 +211,7 @@ function clearResultScreen() {
   auditVerdict.textContent = "";
   auditFindingCount.textContent = "";
   redactedPreview.textContent = "";
-  safeForUseIndicator.textContent = "Safe after redaction: --";
+  safeForUseIndicator.textContent = "Safe for Use: --";
   safeForUseIndicator.classList.remove("safe-yes", "safe-no");
   redactionSection.classList.add("hidden");
   detailsFindings.innerHTML = "";
@@ -762,16 +762,6 @@ function renderDetails(data) {
       ? `${finding.rule_id} - ${finding.rule_label}`
       : finding.reason_label ?? finding.type ?? "Signal";
     item.className = "mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4";
-    const refs = Array.isArray(finding.regulatory_references) ? finding.regulatory_references : [];
-    const refsHtml = refs.length > 0
-      ? `<div class="mt-3">
-           <p class="text-xs uppercase tracking-[0.2em] text-ink-300">Regulatory references</p>
-           <div class="mt-2 flex flex-wrap gap-2">
-             ${refs.map((ref) => `<a href="${escapeHtml(ref.url ?? "")}" target="_blank" rel="noopener noreferrer" class="inline-flex flex-col gap-0.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-ink-100 hover:bg-white/[0.07] transition-colors"><span class="font-medium text-white">${escapeHtml(ref.citation ?? "")}</span><span class="text-ink-300">${escapeHtml(ref.body ?? "")}</span></a>`).join("")}
-           </div>
-         </div>`
-      : "";
-
     item.innerHTML = `
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -789,7 +779,6 @@ function renderDetails(data) {
       <p class="mt-3 text-sm leading-6 text-ink-100">${escapeHtml(finding.confidence_explanation ?? "")}</p>
       <p class="mt-3 break-all rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-xs leading-6 text-ink-100">${escapeHtml(finding.example ?? "")}</p>
       <p class="mt-3 text-sm font-medium text-white">Recommended action: <span class="font-normal text-ink-100">${escapeHtml(finding.recommended_action ?? "")}</span></p>
-      ${refsHtml}
     `;
       section.appendChild(item);
     });
@@ -822,9 +811,8 @@ function renderSuccess(data) {
   auditFindingCount.textContent = String(data.audit_summary?.finding_count ?? data.findings.length ?? 0);
   if (data.status !== "COMPLIANT") {
     redactedPreview.textContent = data.redacted_preview ?? "No automated redaction was applied for the current findings. Manual remediation is still required.";
-    const safeAfterRedaction = data.safe_after_redaction ?? data.safe_for_use ?? false;
-    safeForUseIndicator.textContent = `Safe after redaction: ${safeAfterRedaction ? "YES" : "NO"}`;
-    safeForUseIndicator.classList.add(safeAfterRedaction ? "safe-yes" : "safe-no");
+    safeForUseIndicator.textContent = `Safe for Use: ${data.safe_for_use ? "YES" : "NO"}`;
+    safeForUseIndicator.classList.add(data.safe_for_use ? "safe-yes" : "safe-no");
     redactionSection.classList.remove("hidden");
   }
   renderTopFindings(data, meta);

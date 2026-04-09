@@ -49,7 +49,32 @@ class AuditResponse(BaseModel):
     overall_confidence: float
     overall_confidence_label: str
     overall_confidence_explanation: str
-    safe_for_use: bool
+    safe_after_redaction: bool
     audit_summary: AuditSummary
     redacted_preview: Optional[str] = None
     findings: list[Finding]
+
+
+# ---------------------------------------------------------------------------
+# Audit history models
+# ---------------------------------------------------------------------------
+
+class HistoryEntry(BaseModel):
+    """Lightweight summary row returned by GET /audit/history."""
+    run_id: str
+    timestamp: str
+    profile: str
+    status: str
+    overall_severity: str
+    overall_confidence: float
+    safe_after_redaction: bool
+    input_hash: str       # SHA-256 of original input — for correlation, not reconstruction
+    input_length: int     # Character count of original input
+    finding_count: int
+
+
+class HistoryResponse(BaseModel):
+    total: int            # Total matching runs (before pagination)
+    limit: int
+    offset: int
+    runs: list[HistoryEntry]

@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 from typing import Iterable, Optional
 
 try:
@@ -220,6 +222,32 @@ REGULATORY_CITATIONS: dict[str, list[dict[str, str]]] = {
     ],
 }
 
+def _load_rule_overrides() -> dict[str, dict]:
+    """Load optional per-rule overrides from rules_override.json at startup.
+
+    The file is optional. If it is absent, malformed, or empty, defaults apply.
+    Supported override keys per rule_id:
+      severity           — "low" | "medium" | "high"
+      confidence         — float 0.0–0.99 (base confidence before profile boost)
+      rationale          — str  (replaces the built-in rationale)
+      recommended_action — str  (replaces the built-in recommended action)
+      regulatory_references — list[{citation, body, url}]  (appended to built-ins)
+    """
+    override_path = Path(__file__).parent / "rules_override.json"
+    if not override_path.exists():
+        return {}
+    try:
+        with open(override_path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        rules = data.get("rules") if isinstance(data, dict) else None
+        # Keys beginning with "_" are treated as documentation/comments and are ignored.
+        return {k: v for k, v in rules.items() if isinstance(rules, dict) and not k.startswith("_")} if isinstance(rules, dict) else {}
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+
+
+_RULE_OVERRIDES: dict[str, dict] = _load_rule_overrides()
+
 PROFILE_RULES = {
     "General": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
     "Public Sector": {"health_confidence_boost": 0.0, "financial_confidence_boost": 0.0},
@@ -345,11 +373,28 @@ def _make_finding(
     rationale: str,
     recommended_action: str,
 ) -> Finding:
+    # Apply customer overrides for this rule before building the Finding.
+    override = _RULE_OVERRIDES.get(rule_id, {})
+    if override:
+        severity = override.get("severity", severity)
+        if "confidence" in override:
+            confidence = float(override["confidence"])
+        rationale = override.get("rationale", rationale)
+        recommended_action = override.get("recommended_action", recommended_action)
+
     confidence = _clip_confidence(confidence)
     regulatory_references = [
         RegulatoryReference(**ref)
         for ref in REGULATORY_CITATIONS.get(rule_id, [])
     ]
+    # Append any extra citations declared in the override (does not replace built-ins).
+    if override.get("regulatory_references"):
+        try:
+            extra = [RegulatoryReference(**r) for r in override["regulatory_references"]]
+            regulatory_references = regulatory_references + extra
+        except (TypeError, ValueError):
+            pass  # Malformed override citations are silently ignored.
+
     return Finding(
         type=type,
         reason_code=reason_code,

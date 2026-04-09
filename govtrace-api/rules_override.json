@@ -1,0 +1,20 @@
+{
+  "_doc": "GovTrace rule overrides. Modify this file to customize built-in rule behavior without changing code. Restart the API to apply changes. All keys are optional — omit any key to keep the built-in default.",
+  "rules": {
+    "_doc_schema": {
+      "rule_id": {
+        "severity": "low | medium | high  (overrides the built-in severity)",
+        "confidence": "float 0.0–0.99    (overrides the base confidence before profile boost)",
+        "rationale": "string             (replaces the built-in rationale text)",
+        "recommended_action": "string    (replaces the built-in recommended action)",
+        "regulatory_references": [
+          {
+            "citation": "string  (e.g. 'My Internal Policy §4.2 — Data handling')",
+            "body": "string      (e.g. 'Acme Corp Data Policy')",
+            "url": "string       (link to the source document)"
+          }
+        ]
+      }
+    }
+  }
+}

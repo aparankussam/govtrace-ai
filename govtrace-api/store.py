@@ -80,15 +80,27 @@ CREATE TABLE IF NOT EXISTS audit_runs (
     input_hash          TEXT    NOT NULL,    -- SHA-256 hex of raw input (raw text never stored)
     input_length        INTEGER NOT NULL,    -- character count for analytics
     finding_count       INTEGER NOT NULL,
-    response_json       TEXT    NOT NULL     -- full AuditResponse JSON for exact retrieval
+    response_json       TEXT    NOT NULL,    -- full AuditResponse JSON for exact retrieval
+    record_hash         TEXT,                -- SHA-256 of DoCR body + chain_prev_hash (hash-chain anchor)
+    chain_prev_hash     TEXT                 -- previous record's record_hash; NULL for genesis
 )
 """
+
+# Idempotent column backfill for DBs that existed before the hash-chain columns
+# were introduced. SQLite ALTER TABLE is limited — we just add columns; existing
+# rows land with NULLs in the new columns, which the verifier treats as
+# "pre-chain" rather than corrupt.
+_ADD_RECORD_HASH = "ALTER TABLE audit_runs ADD COLUMN record_hash TEXT"
+_ADD_CHAIN_PREV  = "ALTER TABLE audit_runs ADD COLUMN chain_prev_hash TEXT"
 
 _CREATE_IDX_TIMESTAMP = (
     "CREATE INDEX IF NOT EXISTS idx_audit_runs_timestamp ON audit_runs (timestamp DESC)"
 )
 _CREATE_IDX_STATUS = (
     "CREATE INDEX IF NOT EXISTS idx_audit_runs_status ON audit_runs (status)"
+)
+_CREATE_IDX_RECORD_HASH = (
+    "CREATE INDEX IF NOT EXISTS idx_audit_runs_record_hash ON audit_runs (record_hash)"
 )
 
 
@@ -111,8 +123,16 @@ def init_db() -> None:
         conn = _connect()
         with conn:
             conn.execute(_CREATE_TABLE)
+            # Backfill hash-chain columns on pre-existing DBs. ALTER TABLE
+            # raises "duplicate column" when they already exist — swallow it.
+            for stmt in (_ADD_RECORD_HASH, _ADD_CHAIN_PREV):
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass
             conn.execute(_CREATE_IDX_TIMESTAMP)
             conn.execute(_CREATE_IDX_STATUS)
+            conn.execute(_CREATE_IDX_RECORD_HASH)
         conn.close()
         logger.info("GovTrace audit DB initialised at %s", DB_PATH)
     except Exception:
@@ -128,15 +148,65 @@ def input_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def persist(response_dict: dict, raw_input_hash: str, input_length: int) -> None:
+def get_latest_record_hash() -> Optional[str]:
+    """Return the most recent record_hash (for hash-chaining the next record),
+    or None if no runs exist. Never raises — failures fall back to None which
+    is indistinguishable from 'this is the genesis record'.
+
+    Orders by SQLite `rowid` (monotonic insert order). Ordering by timestamp
+    would bucket same-second runs together, and our run_id tail is random,
+    so neither is a reliable tiebreaker — rowid is."""
+    if not STORAGE_ENABLED:
+        return None
+    try:
+        conn = _connect()
+        row = conn.execute(
+            "SELECT record_hash FROM audit_runs "
+            "WHERE record_hash IS NOT NULL "
+            "ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        return row["record_hash"] if row else None
+    except Exception:
+        logger.exception("Failed to read latest record_hash — treating as genesis")
+        return None
+
+
+def get_by_record_hash(record_hash: str) -> Optional[dict]:
+    """Look up a run by its record_hash. Used by the /verify walker to hop
+    from one record to its predecessor."""
+    if not STORAGE_ENABLED or not record_hash:
+        return None
+    try:
+        conn = _connect()
+        row = conn.execute(
+            "SELECT response_json FROM audit_runs WHERE record_hash = ?",
+            (record_hash,),
+        ).fetchone()
+        conn.close()
+        return json.loads(row["response_json"]) if row else None
+    except Exception:
+        logger.exception("Failed to retrieve run by record_hash=%s", record_hash)
+        return None
+
+
+def persist(
+    response_dict: dict,
+    raw_input_hash: str,
+    input_length: int,
+    record_hash: Optional[str] = None,
+    chain_prev_hash: Optional[str] = None,
+) -> None:
     """
     Persist one audit run. Never raises — failures are logged and swallowed
     so they cannot affect the caller's response.
 
     Args:
-        response_dict:   AuditResponse.model_dump() — already serialised.
-        raw_input_hash:  SHA-256 hex of the original input text.
-        input_length:    Character count of the original input.
+        response_dict:    AuditResponse.model_dump() — already serialised.
+        raw_input_hash:   SHA-256 hex of the original input text.
+        input_length:     Character count of the original input.
+        record_hash:      DoCR's integrity.record_hash (hash-chain anchor).
+        chain_prev_hash:  Predecessor's record_hash, or None for genesis.
     """
     if not STORAGE_ENABLED:
         return
@@ -153,6 +223,8 @@ def persist(response_dict: dict, raw_input_hash: str, input_length: int) -> None
             input_length,
             int(response_dict.get("audit_summary", {}).get("finding_count", 0)),
             json.dumps(response_dict),
+            record_hash,
+            chain_prev_hash,
         )
         conn = _connect()
         with conn:
@@ -161,8 +233,9 @@ def persist(response_dict: dict, raw_input_hash: str, input_length: int) -> None
                 INSERT OR IGNORE INTO audit_runs (
                     run_id, timestamp, profile, status,
                     overall_severity, overall_confidence, safe_after_redaction,
-                    input_hash, input_length, finding_count, response_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    input_hash, input_length, finding_count, response_json,
+                    record_hash, chain_prev_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 row,
             )

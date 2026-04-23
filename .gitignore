@@ -1,3 +1,6 @@
 .DS_Store
 __pycache__/
 .vercel/
+.venv/
+*.pem
+govtrace-api/govtrace_audit.db

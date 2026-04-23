@@ -13,11 +13,11 @@ neither the DoCR body nor the chain pointer has been tampered with.
 Key discovery order (first match wins):
   1. GOVTRACE_SIGNING_KEY_PEM_B64 — base64 of a PEM-encoded Ed25519 private key
   2. GOVTRACE_SIGNING_KEY_PATH    — filesystem path to a PEM private key
-  3. {DATA_DIR}/govtrace_signing_key.pem — auto-generated if absent
 
-The auto-generated fallback is appropriate for local/dev. Production deploys
-should pass a stable key via env (1) or a mounted secret (2) so the public key
-published at /.well-known/govtrace-pubkey.json remains stable across restarts.
+If neither is set the module fails fast at import. The previous "auto-generate
+on first run" path attempted a filesystem write, which crashes on read-only
+serverless filesystems (Vercel, Lambda) and silently rotates the public key
+on every cold start. Both behaviors are worse than a clear startup error.
 """
 from __future__ import annotations
 
@@ -34,21 +34,6 @@ from cryptography.exceptions import InvalidSignature
 
 SIGNATURE_ALGO = "Ed25519"
 PUBLIC_KEY_ID = os.getenv("GOVTRACE_SIGNING_KEY_ID", "govtrace-signing-v1")
-
-_DEFAULT_KEY_FILENAME = "govtrace_signing_key.pem"
-
-
-def _default_key_path() -> Path:
-    """
-    Co-locate the auto-generated key with the audit DB so one volume carries
-    both the ledger and the key that signs it. If GOVTRACE_DB_PATH is set we
-    drop the key next to it; otherwise fall back to this module's directory.
-    """
-    db_path = os.getenv("GOVTRACE_DB_PATH", "").strip()
-    if db_path:
-        return Path(db_path).parent / _DEFAULT_KEY_FILENAME
-    return Path(__file__).parent / _DEFAULT_KEY_FILENAME
-
 
 def _load_from_env_b64() -> Optional[ed25519.Ed25519PrivateKey]:
     b64 = os.getenv("GOVTRACE_SIGNING_KEY_PEM_B64", "").strip()
@@ -78,41 +63,20 @@ def _load_from_env_path() -> Optional[ed25519.Ed25519PrivateKey]:
     return None
 
 
-def _load_or_create_default() -> ed25519.Ed25519PrivateKey:
-    key_path = _default_key_path()
-    if key_path.exists():
-        try:
-            pem = key_path.read_bytes()
-            key = serialization.load_pem_private_key(pem, password=None)
-            if isinstance(key, ed25519.Ed25519PrivateKey):
-                return key
-        except Exception:
-            # Corrupt or wrong-type key file — regenerate rather than fail open.
-            pass
-
-    key = ed25519.Ed25519PrivateKey.generate()
-    pem = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    key_path.parent.mkdir(parents=True, exist_ok=True)
-    # 0o600 — the key file should not be world-readable. Best-effort on
-    # filesystems that don't honor chmod (Windows, some container overlays).
-    try:
-        key_path.write_bytes(pem)
-        os.chmod(key_path, 0o600)
-    except Exception:
-        key_path.write_bytes(pem)
-    return key
-
-
 def _load_signing_key() -> ed25519.Ed25519PrivateKey:
-    return (
-        _load_from_env_b64()
-        or _load_from_env_path()
-        or _load_or_create_default()
-    )
+    key = _load_from_env_b64() or _load_from_env_path()
+    if key is None:
+        raise RuntimeError(
+            "GoVTrace signing key not configured. Set GOVTRACE_SIGNING_KEY_PEM_B64 "
+            "(base64-encoded PEM) or GOVTRACE_SIGNING_KEY_PATH (path to PEM file). "
+            "Generate a local key with: "
+            "python -c \"from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; "
+            "from cryptography.hazmat.primitives import serialization; "
+            "import sys; sys.stdout.buffer.write(Ed25519PrivateKey.generate().private_bytes("
+            "serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, "
+            "serialization.NoEncryption()))\" > key.pem"
+        )
+    return key
 
 
 _PRIVATE_KEY: ed25519.Ed25519PrivateKey = _load_signing_key()

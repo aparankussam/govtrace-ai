@@ -210,6 +210,12 @@ class ReceiptBlock(BaseModel):
     signature: str
     public_key_id: str
     signed_fields: list[str]
+    # Actual key->value mapping that was canonicalized + signed. Embedding it
+    # here makes the receipt fully self-contained: a verifier can re-canonicalize
+    # this dict, hash it, and check the signature against the published public
+    # key without ever holding the full DoCR or calling the API. This is what
+    # makes "tamper-evident" a property of the receipt itself, not the server.
+    signed_fields_data: dict
     canonical_digest: str
     pdf_url: str
     verify_url: str

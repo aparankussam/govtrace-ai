@@ -277,6 +277,68 @@ def well_known_pubkey() -> dict:
     return signing.public_key_info()
 
 
+@app.post("/verify-receipt")
+def verify_receipt(payload: dict) -> dict:
+    """
+    Stateless verification of a GoVTrace signed receipt.
+
+    Accepts any of three shapes (most permissive first):
+      A) The full /audit response: `{... , "receipt": {...}}`
+      B) A bare receipt block:    `{"signed_fields_data": {...}, "signature": "...", ...}`
+      C) Explicit pair:           `{"signed_fields_data": {...}, "signature": "..."}`
+
+    Returns:
+      {
+        "valid": bool,
+        "reason": str,                # human-readable status
+        "public_key_id": str,         # the key id that was used to verify
+        "signature_algo": "Ed25519",
+        "signed_fields_data": {...},  # echoed back for audit trail
+        "verifier_version": "v1"
+      }
+
+    This endpoint is intentionally stateless: it does not consult the audit DB,
+    does not require persistent storage, and works on read-only serverless
+    filesystems. The same property is what auditors need: a verifier that
+    cannot have been "fixed" by the issuer in retrospect.
+    """
+    # Liberal payload extraction. Pull the receipt out of whichever shape the
+    # caller sent, then pull signed_fields_data + signature out of that.
+    receipt = payload.get("receipt") if isinstance(payload.get("receipt"), dict) else payload
+    signed_fields_data = receipt.get("signed_fields_data")
+    signature = receipt.get("signature")
+    pubkey_id = receipt.get("public_key_id") or signing.PUBLIC_KEY_ID
+
+    if not isinstance(signed_fields_data, dict) or not signed_fields_data:
+        return {
+            "valid": False,
+            "reason": "missing_signed_fields_data",
+            "public_key_id": pubkey_id,
+            "signature_algo": signing.SIGNATURE_ALGO,
+            "signed_fields_data": signed_fields_data or {},
+            "verifier_version": "v1",
+        }
+    if not isinstance(signature, str) or not signature:
+        return {
+            "valid": False,
+            "reason": "missing_signature",
+            "public_key_id": pubkey_id,
+            "signature_algo": signing.SIGNATURE_ALGO,
+            "signed_fields_data": signed_fields_data,
+            "verifier_version": "v1",
+        }
+
+    ok = signing.verify_receipt(signed_fields_data, signature)
+    return {
+        "valid": ok,
+        "reason": "signature_valid" if ok else "signature_invalid",
+        "public_key_id": pubkey_id,
+        "signature_algo": signing.SIGNATURE_ALGO,
+        "signed_fields_data": signed_fields_data,
+        "verifier_version": "v1",
+    }
+
+
 @app.get("/metrics/corpus")
 def metrics_corpus(refresh: bool = Query(default=False)):
     """Full labeled-corpus evaluation: per-rule + per-category metrics and
@@ -486,6 +548,7 @@ def audit(req: AuditRequest) -> AuditResponse:
         signature=receipt_signature,
         public_key_id=signing.PUBLIC_KEY_ID,
         signed_fields=list(receipt_signed_fields.keys()),
+        signed_fields_data=receipt_signed_fields,
         canonical_digest=canonical_digest,
         pdf_url=f"/audit/{response.run_id}/receipt.pdf",
         verify_url=f"/audit/verify/{response.run_id}",

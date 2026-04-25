@@ -1,0 +1,37 @@
+{
+  "name": "@gobotsai/govtrace",
+  "version": "0.1.0",
+  "description": "Independent verifier for GoVTrace Receipt v1. Stateless. Offline-capable. Ed25519.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "govtrace": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "govtrace",
+    "ai-notarization",
+    "ed25519",
+    "receipt",
+    "verifier",
+    "audit",
+    "compliance"
+  ],
+  "homepage": "https://gobotsai.com/spec",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aparankussam/govtrace-ai.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/aparankussam/govtrace-ai/issues"
+  },
+  "author": "GoVTraceAI / gobots"
+}

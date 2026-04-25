@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gobotsai.com/spec/receipt.schema.json",
+  "title": "GoVTrace Receipt",
+  "description": "A v1 GoVTrace Receipt: a portable, third-party-verifiable, Ed25519-signed attestation that an AI action was evaluated by a named policy and produced a named verdict at a named time.",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "signed_at",
+    "signature_algo",
+    "signature",
+    "public_key_id",
+    "signed_fields",
+    "signed_fields_data",
+    "canonical_digest"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this receipt. Format is issuer-defined."
+    },
+    "signed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 UTC timestamp at which the receipt was signed."
+    },
+    "signature_algo": {
+      "type": "string",
+      "const": "Ed25519",
+      "description": "MUST be 'Ed25519' in v1."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "Unpadded base64url Ed25519 signature over sha256(canonical_bytes)."
+    },
+    "public_key_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the issuing public key. MUST equal the key_id field in the issuer's published key document."
+    },
+    "signed_fields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Ordered list of keys present in signed_fields_data."
+    },
+    "signed_fields_data": {
+      "type": "object",
+      "description": "The actual key->value mapping that was canonicalized and signed.",
+      "required": [
+        "run_id",
+        "verdict",
+        "record_hash",
+        "policy_digest",
+        "input_hash",
+        "timestamp"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Issuer-defined identifier for the AI action being attested."
+        },
+        "verdict": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The decision: STOP, NEEDS_REVIEW, SAFE, or issuer-defined."
+        },
+        "record_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase SHA-256 hex of the canonical Duty-of-Care Record."
+        },
+        "policy_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase SHA-256 hex of the policy bundle that produced the verdict."
+        },
+        "input_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase SHA-256 hex of the AI action's input bytes."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC 3339 UTC timestamp of the verdict."
+        }
+      }
+    },
+    "canonical_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase SHA-256 hex of the canonical bytes of signed_fields_data."
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "Optional issuer-served URL to a human-readable PDF rendition."
+    },
+    "verify_url": {
+      "type": "string",
+      "description": "Optional issuer-served URL to walk the chain (if the issuer maintains one)."
+    }
+  }
+}
